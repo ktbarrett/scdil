@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.mypy]
+exclude = '^build/'   # /build/ is output of `pip install .`
+                      # Must exclude it since pre-commit does not stash untracked changes
+strict = true
+
+[tool.isort]
+profile = "black"
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",                           # must specify this since adding others overrides defaults
+    "@(?:abc\\.)?abstract(?:method|property|classmethod|staticmethod)",  # skip abstract functions
+    "@(?:typing\\.)?overload",                    # skip overloads lines
+    "if\\s+(not)?\\s+(typing\\.)?TYPE_CHECKING:"  # skip TYPE_CHECKING blocks
+]

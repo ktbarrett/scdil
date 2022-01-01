@@ -1,0 +1,10 @@
+# running python
+__pycache__/
+
+# installing the package
+/build/
+*.egg-info/
+
+# running coverage
+.coverage
+coverage.xml
