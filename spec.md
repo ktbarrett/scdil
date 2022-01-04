@@ -143,7 +143,7 @@ Structural features organize data in an easily readible way, and are primarily f
 
 **Regex/PEG**
 ```
-struct = section / list / paragraph
+struct = sections / items / paragraph
 ```
 
 ### Sections
@@ -184,13 +184,13 @@ name = (
     ((namechar - "[+-\.?:~[\]{},!&*|>%@\"'`]") namechar*))
     - ".Inf"
     - ".NaN"
-section = indent (name / string) ":" (struct / value) (nodent (name / string) ":" (struct / value))* dedent
+sections = indent (name / string) ":" (struct / value) (nodent (name / string) ":" (struct / value))* dedent
 ```
 
-### Lists
+### Items
 
-Lists are a more readible and writable way to do sequences.
-Lists can be started in any structural context.
+Items are a more readible and writable way to do sequences.
+Items can be started in any structural context.
 Elements are prefix with `-` and at least one space followed by any value.
 Each element must appear on a new line with the same level of indentation as the list element in the list.
 
@@ -209,7 +209,7 @@ Each element must appear on a new line with the same level of indentation as the
 
 **Regex/PEG**
 ```
-list = (indent / nodent) "-" (struct / value) (nodent "-" (struct / value))* dedent
+items = (indent / nodent) "-" (struct / value) (nodent "-" (struct / value))* dedent
 ```
 
 ### Paragraphs
@@ -241,7 +241,7 @@ paragraph = "|" indent string_body (nodent string_body)* dedent
 ## Total Language
 
 ```
-syaml = struct / value
+syaml = struct / (indent value dedent)
 value = scalar / composite
 scalar = null / boolean / number / string
 composite = sequence / mapping
@@ -262,8 +262,8 @@ name = (
     ((namechar - "[+-\.?:~[\]{},!&*|>%@\"'`]") namechar*))
     - ".Inf"
     - ".NaN"
-section = indent (name / string) ":" (struct / value) (nodent (name / string) ":" (struct / value))* dedent
-list = (indent / nodent) "-" (struct / value) (nodent "-" (struct / value))* dedent
+sections = indent (name / string) ":" (struct / value) (nodent (name / string) ":" (struct / value))* dedent
+items = (indent / nodent) "-" (struct / value) (nodent "-" (struct / value))* dedent
 paragraph = "|" indent string_body (nodent string_body)* dedent
 indent = newline with increase in indentation compared to last line that had code
 dedent = newline with decrease in indentation compared to last line that had code
