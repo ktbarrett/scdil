@@ -110,7 +110,7 @@ def _(
         raise NotImplementedError
     else:
         stream.write("[")
-        for v, last in _mark_last(value):
+        for v, last in mark_last(value):
             dump(v, stream, for_humans=for_humans)
             if not last:
                 stream.write(",")
@@ -130,7 +130,7 @@ def _(
         raise NotImplementedError
     else:
         stream.write("{")
-        for (k, v), last in _mark_last(value.items()):
+        for (k, v), last in mark_last(value.items()):
             dump(k, stream, for_humans=for_humans)
             if isinstance(k, str):
                 stream.write(":")
@@ -142,18 +142,16 @@ def _(
         stream.write("}")
 
 
-def _mark_last(__iterable: Iterable[T]) -> Iterator[Tuple[T, bool]]:
-    it = iter(__iterable)
+def mark_last(iterable: Iterable[T]) -> Iterator[Tuple[T, bool]]:
+    it = iter(iterable)
     try:
-        prev_v = next(it)
+        v = next(it)
     except StopIteration:
         return
-    while True:
-        try:
-            v = next(it)
-        except StopIteration:
-            yield prev_v, True
-            return
-        else:
-            yield prev_v, False
+    try:
+        while True:
             prev_v = v
+            v = next(it)
+            yield prev_v, False
+    except StopIteration:
+        yield prev_v, True
