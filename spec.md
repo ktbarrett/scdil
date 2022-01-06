@@ -39,9 +39,9 @@ postfixed with an optional decimal point and fractional part,
 further postfixed with an optional exponential part.
 
 Additionally, there are the special number values that are spelled with keywords:
-* `.Inf` for positive infinity
-* `-.Inf` for negative infinity
-* `.NaN` for "not a number"
+* `.inf` for positive infinity
+* `-.inf` for negative infinity
+* `.nan` for "not a number"
 
 **Example**
 ```
@@ -52,8 +52,8 @@ Additionally, there are the special number values that are spelled with keywords
 
 **Regex/PEG**
 ```
-numer_keywords = "[+-]?\.Inf" / "\.NaN"
-number = "[+-]?\d+(.\d+)?([eE][+-]?\d+)?" / number_keywords
+number_keywords = -?\.inf / \.nan
+number = "0" / ( "-"? "[1-9]" "[0-9]"* ( "." "[0-9]"+ )? ( "[eE]" "[+-]"? "[0-9]"* )? ) / number_keywords
 ```
 
 ### Strings
@@ -248,8 +248,8 @@ composite = sequence / mapping
 struct = section / list / paragraph
 null = "null"
 boolean = "true" / "false"
-number_keywords = "[+-]?\.Inf" / "\.NaN"
-number = "[+-]?\d+(.\d+)?([eE][+-]?\d+)?" / number_keywords
+number_keywords = -?\.inf / \.nan
+number = "0" / ( "-"? "[1-9]" "[0-9]"* ( "." "[0-9]"+ )? ( "[eE]" "[+-]"? "[0-9]"* )? ) / number_keywords
 string_body = "(?:[^\\\"]|\\(?:[\"\\nrtbf/]|x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}))*"
 string = "\"" string_body "\""
 sequence = "[" (value ",")* (value ","?)? "]"
