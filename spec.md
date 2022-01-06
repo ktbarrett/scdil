@@ -72,7 +72,7 @@ Allowable escape codes are:
 * `\/`: the `/` character
 * `\x{hex}{hex}`: byte literal for sending binary data
 * `\u{hex}{hex}{hex}{hex}`: unicode code point
-* `\U{hex}{hex}{hex}{hex}{hex}{hex}{hex}{hex}`: unicode code point
+* `\U{hex}{hex}{hex}{hex}{hex}{hex}{hex}{hex}`: extended unicode code point
 
 **Example**
 ```
@@ -83,9 +83,14 @@ Allowable escape codes are:
 
 **Regex/PEG**
 ```
-string_body = "(?:[^\\\"]|\\(?:[\"\\nrtbf/]|x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}))*"
-string = "\"" string_body "\""
+hex = "[0-9a-fA-F]"
+character = "[\U00000020-\U0000007E\U000000A0-\U0010FFFF]"
+escape = "\\" ("[\"\\/bfnrt]" / ("x" hex^2 ) / ("u" hex^4) / ("U" hex^8) )
+string = "\"" ( escape / (character - "\"") )* "\""
 ```
+
+**Note** the DEL character and the C1 control character set are not supported.
+This does subtly break JSON support.
 
 ## Composite Types
 
@@ -232,10 +237,8 @@ b: 1
 
 **Regex/PEG**
 ```
-paragraph = "|" indent string_body (nodent string_body)* dedent
+paragraph = "|" indent character* (nodent character*)* dedent
 ```
-
-**Note**: In this production `nodent` is *assumed*, so any increase in indentation is treated as initial whitespace on that line.
 
 
 ## Total Language
@@ -250,8 +253,10 @@ null = "null"
 boolean = "true" / "false"
 number_keywords = -?\.inf / \.nan
 number = "0" / ( "-"? "[1-9]" "[0-9]"* ( "." "[0-9]"+ )? ( "[eE]" "[+-]"? "[0-9]"* )? ) / number_keywords
-string_body = "(?:[^\\\"]|\\(?:[\"\\nrtbf/]|x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}))*"
-string = "\"" string_body "\""
+hex = "[0-9a-fA-F]"
+character = "[\U00000020-\U0000007E\U000000A0-\U0010FFFF]"
+escape = "\\" ("[\"\\/bfnrt]" / ("x" hex^2 ) / ("u" hex^4) / ("U" hex^8) )
+string = "\"" ( escape / (character - "\"") )* "\""
 sequence = "[" (value ",")* (value ","?)? "]"
 mapping = "{" (value ":" value ",")* (value ":" value ","?)? "}"
 namechar = All unicode - control characters - " "
@@ -264,7 +269,7 @@ name = (
     - ".NaN"
 sections = indent (name / string) ":" (struct / value) (nodent (name / string) ":" (struct / value))* dedent
 items = (indent / nodent) "-" (struct / value) (nodent "-" (struct / value))* dedent
-paragraph = "|" indent string_body (nodent string_body)* dedent
+paragraph = "|" indent character* (nodent character*)* dedent
 indent = newline with increase in indentation compared to last line that had code
 dedent = newline with decrease in indentation compared to last line that had code
 nodent = newline with no change in indentation compared to that last line that had code
