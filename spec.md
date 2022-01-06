@@ -154,19 +154,10 @@ struct = sections / items / paragraph
 ### Sections
 
 Sections are a more readible and writable way to create mappings.
-Keys in sections are typically specifically with "names".
+Keys in sections are typically specifically with identifiers.
 Sections can be started in any structural context.
 Keys in sections are names or quoted strings, they are followed by the `:` character, and then any structural, composite, or scalar value.
 Successive key-value pairs must appear on successing lines with the same level of indentation as the first key-value pair in the section.
-
-Names are string literals that are not deliminated with quotes and have several limitations:
-* do not support escape codes
-* do not support whitespace
-* do not support control characters
-* cannot start with numbers, or `-`, `.` followed by a number
-* cannot start with `[`, `]`, `{`, `}`, `,`, `!`, `&`, `*`, `|`, `>`, `%`, `@`, `"`, `'`, or `` ` ``
-* can start with `-`, `~`, `?`, `:`, but there must be at least one other character
-* cannot be a keyword in the language: `null`, `true`, `false`, `.Inf`, `+.Inf`, `-.Inf` `.NaN`
 
 **Example**
 ```
@@ -175,21 +166,15 @@ config:
   optional_param: null
   constructed_param: ["type", {"a": 1, "b": 2}]
   files:
-    ../../file.txt: "set1"
-    file2.py: "set2"
+    "../../file.txt": "set1"
+    "file2.py": "set2"
 ```
 
 **Regex/PEG**
 ```
-namechar = All unicode - control characters - " "
-name = (
-    ("[+-]" (namechar - "[0-9.]") namechar*) /
-    ("\." (namechar - "[0-9]") namechar*) /
-    ("[?:~]" namechar+) /
-    ((namechar - "[+-\.?:~[\]{},!&*|>%@\"'`]") namechar*))
-    - ".Inf"
-    - ".NaN"
-sections = indent (name / string) ":" (struct / value) (nodent (name / string) ":" (struct / value))* dedent
+letter = "[_a-zA-Z\U000000A0-\UFFFFFFFF]"
+identifier = letter (letter / "[0-9]")*
+sections = indent (identifier / string) ":" (struct / value) (nodent (identifier / string) ":" (struct / value))* dedent
 ```
 
 ### Items
@@ -259,15 +244,9 @@ escape = "\\" ("[\"\\/bfnrt]" / ("x" hex^2 ) / ("u" hex^4) / ("U" hex^8) )
 string = "\"" ( escape / (character - "\"") )* "\""
 sequence = "[" (value ",")* (value ","?)? "]"
 mapping = "{" (value ":" value ",")* (value ":" value ","?)? "}"
-namechar = All unicode - control characters - " "
-name = (
-    ("[+-]" (namechar - "[0-9.]") namechar*) /
-    ("\." (namechar - "[0-9]") namechar*) /
-    ("[?:~]" namechar+) /
-    ((namechar - "[+-\.?:~[\]{},!&*|>%@\"'`]") namechar*))
-    - ".Inf"
-    - ".NaN"
-sections = indent (name / string) ":" (struct / value) (nodent (name / string) ":" (struct / value))* dedent
+letter = "[_a-zA-Z\U000000A0-\UFFFFFFFF]"
+identifier = letter (letter / "[0-9]")*
+sections = indent (identifier / string) ":" (struct / value) (nodent (identifier / string) ":" (struct / value))* dedent
 items = (indent / nodent) "-" (struct / value) (nodent "-" (struct / value))* dedent
 paragraph = "|" indent character* (nodent character*)* dedent
 indent = newline with increase in indentation compared to last line that had code
