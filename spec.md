@@ -229,11 +229,11 @@ paragraph = "|" indent character* (nodent character*)* dedent
 ## Total Language
 
 ```
-syaml = struct / (indent value dedent)
+scdil = struct / (indent value dedent)
 value = scalar / composite
 scalar = null / boolean / number / string
 composite = sequence / mapping
-struct = section / list / paragraph
+struct = sections / items / paragraph
 null = "null"
 boolean = "true" / "false"
 number_keywords = -?\.inf / \.nan
