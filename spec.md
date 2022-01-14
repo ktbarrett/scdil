@@ -1,67 +1,117 @@
 # Simple Configuration and Data Interchange Language Specification
 
+## Whitespace
+
+Whitespace includes spaces (` `) and newlines (`\n`, `\r\n`, `\r`).
+Whitespace is ignored by the lexer.
+Tab characters are *not* allowable whitespace.
+Non-breaking spaces (U+00A0) are *not* allowable whitespace.
+
+**Parse Rules**
+```
+ws = " " | "\n" | "\r\n" | "\r"
+```
+
 ## Comments
 
 Comments start with `#` and run until the end of the line.
+Comments are ignored by the lexer.
 
+**Examples**
 ```
-# comment
-a: 1  # also comment
+```
+
+**Parse Rules**
+```
+comment = "#" "[^\n]"* "\n"
 ```
 
 ## Scalar Types
 
-**Regex/PEG**
+**Parse Rules**
 ```
-scalar = null / boolean / number / string
+scalar = null / boolean / integer / float / string
 ```
 
 ### `null`
 
-**Regex/PEG**
+**Parse Rules**
 ```
 null = "null"
 ```
 
 ### Booleans
 
-**Regex/PEG**
+**Parse Rules**
 ```
 boolean = "true" / "false".
 ```
 
-### Numbers
+### Integers
 
-Numbers are IEE754-esque floating point numbers.
-A number literal is an integer part (required),
-prefixed with an optional positive or negative sign,
-postfixed with an optional decimal point and fractional part,
-further postfixed with an optional exponential part.
-
-Additionally, there are the special number values that are spelled with keywords:
-* `.inf` for positive infinity
-* `-.inf` for negative infinity
-* `.nan` for "not a number"
-
-**Example**
+**Examples**
 ```
 0
--0.00001
-1123.0e+4
+-1
+42
+0xDEADbeef
+0b001100010010011110100001101101110011
+0o644
 ```
 
-**Regex/PEG**
+**Parse Rules**
 ```
-number_keywords = -?\.inf / \.nan
-number = "0" / ( "-"? "[1-9]" "[0-9]"* ( "." "[0-9]"+ )? ( "[eE]" "[+-]"? "[0-9]"* )? ) / number_keywords
+integer = "[+-]"? ("0" | decimal_literal | hex_literal | octal_literal | binary_literal)
+decimal_literal = "[1-9]" "[0-9]"*
+hex_literal = "0" "[xX]" "[0-9A-Fa-f]"+
+octal_literal = "0" "[oO]" "[0-7]"+
+binary_literal = "0" "[bB]" "[01]"+
 ```
 
-### Strings
+**Implementation Note**: Integers are preferably arbitrary-precision integers,
+but should be signed 64-bit integers (int64_t or similar) at a minimum.
 
-Strings are delimited with `"` characters.
-Strings cannot contain any non-visible character, including newlines and horizontal tabs; and instead rely on escape codes.
+**Implementation Note**:
+Implementations with limited-precision integers should provide a mechanism to inform the code loading the document when integer overflow occurs.
+When overflow occurs, the resulting value is allowed to be implementation-defined.
 
-Allowable escape codes are:
+### Floats
+
+**Examples**
+```
++0.123
+-1234123e4
+12.34e-5
++inf
+nan
+```
+
+**Parse Rules**
+```
+float = integer (fractional exponent? | exponent) | "[+-]"? "inf" | "nan"
+fractional = "." "[0-9]"*
+exponent = "[eE]" "[+-]"? "[0-9]"+
+```
+
+**Implementation Note**: Floats natively are preferably double-precision IEEE754 floating point numbers;
+although single-precision is allowable.
+
+**Implementation Note**: Float support is preferable, but optional. This is to allow supporting targets that have no native floating point type.
+Implementations that don't support floats should provide a mechanism to inform the code loading the document when a float is seen.
+The resulting value is allowed to be implementation-defined.
+
+### Escape Codes and Characters
+
+Characters in strings and block strings can be any Unicode codepoint besides:
+* the C0 control character set (U+0000 through U+001F)
+* the C1 control character set (U+0080 through U+009F)
+* the DEL codepoint (U+007F)
+
+**Note**: Newlines (`\n`, `\r\n`, or `\r`) and tabs (`\t`) are in the C0 character set and are ***not allowed in strings***.
+Instead, the user is expected to use escape codes.
+This is intentional.
+
+Escape codes supported in strings and escaped block strings are:
 * `\n`: newline
 * `\t`: tab character
 * `\r`: carriage return
@@ -71,185 +121,241 @@ Allowable escape codes are:
 * `\f`: form feed
 * `\/`: the `/` character
 * `\x{hex}{hex}`: byte literal for sending binary data
-* `\u{hex}{hex}{hex}{hex}`: unicode code point
-* `\U{hex}{hex}{hex}{hex}{hex}{hex}{hex}{hex}`: extended unicode code point
+* `\u{hex}{hex}{hex}{hex}`: unicode codepoint
+* `\U{hex}{hex}{hex}{hex}{hex}{hex}{hex}{hex}`: extended unicode codepoint
 
-**Example**
-```
-"Hello! \U0001F603"
-">\t prompt"Composite
-"\xDE\xAD\xBE\xEF"
-```
+**Note** the DEL character and the C1 control characters are not supported; however, they are supported in JSON.
+While this breaks JSON support, it is intentional.
 
-**Regex/PEG**
+**Parse Rules**
 ```
-hex = "[0-9a-fA-F]"
 character = "[\U00000020-\U0000007E\U000000A0-\U0010FFFF]"
-escape = "\\" ("[\"\\/bfnrt]" / ("x" hex^2 ) / ("u" hex^4) / ("U" hex^8) )
-string = "\"" ( escape / (character - "\"") )* "\""
+escape = "\\" (
+      "\\"
+    | "/"
+    | """
+    | "b"
+    | "f"
+    | "n"
+    | "r"
+    | "t"
+    | "x" "[0-9A-Fa-f]"^2
+    | "u" "[0-9A-Fa-f]"^4
+    | "U" "[0-9A-Fa-f]"^8
+)
 ```
 
-**Note** the DEL character and the C1 control character set are not supported.
-This does subtly break JSON support.
+### Strings
+
+Strings are a sequence of characters or escape code delimited with `"` characters.
+
+**Examples**
+```
+"Hello, World!\n"
+"\xDE\xAD\xBE\xEF"
+"\U0001F604"
+```
+
+**Parse Rules**
+```
+string = "\"" (escape | (!"\"" character))* "\""
+```
 
 ## Composite Types
 
 Composite types are primarily for program-to-program data interchange or as a terse single-line syntax at leafs of configuration files.
+Composites are comprised solely of scalars or nested compsites; no block entities are allowed.
+Whitespace is not significant inside of a composite.
 
-**Regex/PEG**
+**Parse Rules**
 ```
 composite = sequence / mapping
 ```
 
 ### Sequences
 
-Sequences are started with the `[` character,
-end with the `]` character,
-and each element is separated with a `,` character.
-Sequences can contain any scalar or composite value as elements.
-Sequences are heterogenously-typed.
-All newlines inside a sequence definition are ignored as whitespace.
+Sequences are heterogenously-typed ordered collections.
 
-**Example**
+**Examples**
 ```
 [1, "2", null]
-[{"a": 1}, [5, 6, 4, 3]]
+[
+    {"a": 1}, [5, 6, 4, 3]
+    1, 2, 3
+]
 ```
 
-**Regex/PEG**
+**Parse Rules**
 ```
 sequence = "[" (value ",")* (value ","?)? "]"
 ```
 
 ### Mappings
 
-Mappings are started with the `{` character,
-end with the `}` character,
-and each element is a key-value pair separated with a `,` character.
-Key-value pairs are a "key", which is any scalar or composite value;
-and a "value", which is any scalar or composite value;
-separated by a `:` character.
-Mappings are heterogenously-typed in both their keys and values.
-All newlines inside a mapping definition are ignored as whitespace.
+Mappings are heterogenously-typed unordered associative collections.
+Mapping keys must be unique.
 
-**Example**
+**Examples**
 ```
-{"a": 6, 1: null  , [1, 2, 3]: {}}
+{"a": 6, 1: null, [1, 2, 3]: {}}
+{
+    0: false,
+            1: true
+}
 ```
 
-**Regex/PEG**
+**Parse Rules**
 ```
 mapping = "{" (value ":" value ",")* (value ":" value ","?)? "}"
 ```
 
-## Structural Features
+## Blocks
 
-Structural features organize data in an easily readible way, and are primarily for human-to-program data interchange.
+Blocks organize data in an easily readible way, and are primarily for human-to-program data interchange (AKA configuration).
+Blocks start when the first element of the block is seen at an logical indentation level greater than the encompasing block.
+Then they end when an element of some other block at a lower indentation level is seen.
+Each element of a block must start on the next non-empty line.
 
-**Regex/PEG**
+**Parse Rules**
 ```
-struct = sections / items / paragraph
-```
-
-### Sections
-
-Sections are a more readible and writable way to create mappings.
-Keys in sections are typically specifically with identifiers.
-Sections can be started in any structural context.
-Keys in sections are names or quoted strings, they are followed by the `:` character, and then any structural, composite, or scalar value.
-Successive key-value pairs must appear on successing lines with the same level of indentation as the first key-value pair in the section.
-
-**Example**
-```
-config:
-  param: "value"
-  optional_param: null
-  constructed_param: ["type", {"a": 1, "b": 2}]
-  files:
-    "../../file.txt": "set1"
-    "file2.py": "set2"
+block(N) = block_sequence(N) | block_mapping(N) | block_string(N)
 ```
 
-**Regex/PEG**
-```
-letter = "[_a-zA-Z\U000000A0-\UFFFFFFFF]"
-identifier = letter (letter / "[0-9]")*
-sections = indent (identifier / string) ":" (struct / value) (nodent (identifier / string) ":" (struct / value))* dedent
-```
+### Block Sequences
 
-### Items
+Block sequences are the block form of sequences.
+Each element in the sequence starts on a different line with the `-` character.
 
-Items are a more readible and writable way to do sequences.
-Items can be started in any structural context.
-Elements are prefix with `-` and at least one space followed by any value.
-Each element must appear on a new line with the same level of indentation as the list element in the list.
-
-**Example**
+**Examples**
 ```
 - 1
-- null
-- [1, 2, 3]
--
-  - 1
-  -
-    a: 1
-    b: 2
-- "value"
+- 2
+-        # start new block on next line
+  - 3
+  - - 4  # start block on the same line
+    - 5
 ```
 
-**Regex/PEG**
+**Parse Rules**
 ```
-items = (indent / nodent) "-" (struct / value) (nodent "-" (struct / value))* dedent
-```
-
-### Paragraphs
-
-Paragraphs are multi-line string literals, allowing you to embed other formats directly into your data.
-Paragraphs are started with a `|` character.
-The paragraph text starts on the line after the `|` character with an increase in indentation.
-The paragraph text ends when the next line is a decrease in indentation.
-Whatever the indentation of the first line in the paragraph is is subtracted from the succeeding lines in the paragraph.
-
-**Warning**: you cannot use comments in the paragraph text, they will be interpreted as a part of the value.
-
-**Example**
-```
-a: |
-  The quick brown fox jumped over the lazy dog.
-  Then the young pup quickly persued.
-b: 1
+block_sequence(N, M) where M>N = ("-"(N) (value | block(M)))+
 ```
 
-**Regex/PEG**
+### Block Mappings
+
+Block mappings are the block form of mappings.
+Each element in the mapping starts on a different line with either an unquoted name or a string, followed by the `:` character.
+Names are unquoted strings with no spaces, and are limited in which characters can be used (to ease parsing).
+Names are prefered for block mapping keys, but if you need to use a character that isn't supported by names, you can use a quoted string instead.
+If your mapping contains key types other than strings, it is recommended to use a non-block mapping.
+
+**Examples**
 ```
-paragraph = "|" indent character* (nodent character*)* dedent
+a: 1
+b:            # start block on the next line
+  c: 1
+  d: e: 1     # start block on the same line
+     "\n": 2  # use a string instead of a name
 ```
 
+**Parse Rules**
+```
+block_mapping(N, M) where M>N = ((name | string)(N) ":" (value | block(M)))+
+name = letter (letter | "[0-9]")*
+letter = "[_a-zA-Z\U000000A0-\U0010FFFF]"
+```
+
+### Block Strings
+
+Block strings allow the user to write multi-line string literals.
+This is often used to embed other data formats directly into your document.
+
+There are four kinds of lines in a block string depending on the character used to start the line.
+* `|`: don't convert any escape codes and include the trailing space and newline.
+* `>`: don't convert any escape codes and "fold" the line into the next one.
+* `\|`: convert any escape codes and include any trailing space and newline.
+* `\>`: convert any escape codes and "fold" the line into the next one.
+
+Line "folding" is done by:
+1. Striping any space at the beginning of the line.
+2. Replacing any trailing whitespace and the newline with a single space.
+3. Unless the line is empty; in which case the line is replaced with a single newline.
+
+This folding logic is similar to how Github renders Markdown, or LaTeX renders text.
+
+
+**Examples**
+```
+a:
+  |for i in range(10):
+  |    if i % 2 == 0:
+  |        print(i)
+  |
+b:
+  > Writing one sentence per line.
+  > SCDIL will join them together.
+  >
+  > But not this one.
+```
+
+**Parse Rules**
+```
+block_string(N) = literal_line(N)+ | folded_line(N)+ | escaped_literal_line@(N)+ | escaped_folded_line(N)+
+literal_line(N) = "|"(N) character* "\n"
+folded_line(N) = ">"(N) character* "\n"
+escaped_literal_line(N) = "\|"(N) (escape | character)* "\n"
+escaped_folded_line(N) = "\>"(N) (escape | character)* "\n"
+```
+
+**Warning**: Comments in block strings will be interpreted as a part of the string.
 
 ## Total Language
 
+The language description uses a combination of RegEx and PEG notation.
+Rules on blocks use function call syntax to describe the indentation level of the block.
+Those rules may also contain predicates.
+
 ```
-scdil = struct / (indent value dedent)
-value = scalar / composite
-scalar = null / boolean / number / string
-composite = sequence / mapping
-struct = sections / items / paragraph
-null = "null"
-boolean = "true" / "false"
-number_keywords = -?\.inf / \.nan
-number = "0" / ( "-"? "[1-9]" "[0-9]"* ( "." "[0-9]"+ )? ( "[eE]" "[+-]"? "[0-9]"* )? ) / number_keywords
-hex = "[0-9a-fA-F]"
+scdil = value | block(0)
+value = scalar | composite
+scalar = null | bool | integer | float | string
+composite = sequence | mapping
+block(N) = block_sequence(N) | block_mapping(N) | block_string(N)
+block_sequence(N, M) where M>N = ("-"(N) (value | block(M)))+
+block_mapping(N, M) where M>N = ((name | string)(N) ":" (value | block(M)))+
+block_string(N) = literal_line(N)+ | folded_line(N)+ | escaped_literal_line@(N)+ | escaped_folded_line(N)+
+literal_line(N) = "|"(N) character* "\n"
+folded_line(N) = ">"(N) character* "\n"
+escaped_literal_line(N) = |(N) (escape | character)* "\n"
+escaped_folded_line(N) = "\>"(N) (escape | character)* "\n"
+escape = "\\" (
+      "\\"
+    | "/"
+    | """
+    | "b"
+    | "f"
+    | "n"
+    | "r"
+    | "t"
+    | "x" "[0-9a-fA-F]"^2
+    | "u" "[0-9a-fA-F]"^4
+    | "U" "[0-9a-fA-F]"^8
+)
 character = "[\U00000020-\U0000007E\U000000A0-\U0010FFFF]"
-escape = "\\" ("[\"\\/bfnrt]" / ("x" hex^2 ) / ("u" hex^4) / ("U" hex^8) )
-string = "\"" ( escape / (character - "\"") )* "\""
+null = "null"
+bool = "true" | "false"
+integer = "[+-]"? (decimal_literal | hex_literal | octal_literal | binary_literal)
+decimal_literal = "[1-9]" "[0-9]"*
+hex_literal = "0[xX]" "[0-9a-fA-F]"+
+octal_literal = "0[oO]" "[0-7]"+
+binary_literal = "0[bB]" "[01]"+
+float = int (fractional exponent? | exponent) | "[+-]"? "inf" | "nan"
+fractional = "." "[0-9]"*
+exponent = "[eE]" "[+-]"? "[0-9]"+
+string = "\"" (escape | (!"\"" character))* "\""
+name = letter (letter | "[0-9]")*
+letter = "[_a-zA-Z\U000000A0-\U0010FFFF]"
 sequence = "[" (value ",")* (value ","?)? "]"
 mapping = "{" (value ":" value ",")* (value ":" value ","?)? "}"
-letter = "[_a-zA-Z\U000000A0-\UFFFFFFFF]"
-identifier = letter (letter / "[0-9]")*
-sections = indent (identifier / string) ":" (struct / value) (nodent (identifier / string) ":" (struct / value))* dedent
-items = (indent / nodent) "-" (struct / value) (nodent "-" (struct / value))* dedent
-paragraph = "|" indent character* (nodent character*)* dedent
-indent = newline with increase in indentation compared to last line that had code
-dedent = newline with decrease in indentation compared to last line that had code
-nodent = newline with no change in indentation compared to that last line that had code
+comment = "#" "[^\n]"* "\n"
 ```
