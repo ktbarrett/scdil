@@ -243,7 +243,7 @@ Each element in the sequence starts on a different line with the `-` character.
 
 **Parse Rules**
 ```
-block_sequence(N, M) where M>N = ("-"(N) (value newline+ | newline* block(M)))+
+block_sequence(N, M) where M>N = ("-"@N scdil(M))+
 ```
 
 ### Block Mappings
@@ -265,7 +265,7 @@ b:            # start block on the next line
 
 **Parse Rules**
 ```
-block_mapping(N, M) where M>N = ((name | string)(N) ":" (value newline+ | newline* block(M)))+
+block_mapping(N, M) where M>N = ((name | string)@N ":" scdil(M))+
 name = letter (letter | "[0-9]")*
 letter = "[_a-zA-Z\U000000A0-\U0010FFFF]"
 ```
@@ -306,14 +306,14 @@ b:
 **Parse Rules**
 ```
 block_string(N) = literal_lines(N) | folded_lines(N) | escaped_literal_lines(N) | escaped_folded_lines(N)
-literal_lines(N) = (literal_line(N) newline*)+
-literal_line(N) = "|"(N) character* nl
-folded_lines(N) = (folded_line(N) newline*)+
-folded_line(N) = ">"(N) character* nl
-escaped_literal_lines(N) = (escaped_literal_line(N) newline*)+
-escaped_literal_line(N) = "\|"(N) (escape | character)* nl
-escaped_folded_lines(N) = (escaped_folded_line(N) newline*)+
-escaped_folded_line(N) = "\>"(N) (escape | character)* nl
+literal_lines(N) = (literal_line@N newline*)+
+literal_line = "|" character* nl
+folded_lines(N) = (folded_line@N newline*)+
+folded_line = ">" character* nl
+escaped_literal_lines(N) = (escaped_literal_line@N newline*)+
+escaped_literal_line = "\|" (escape | character)* nl
+escaped_folded_lines(N) = (escaped_folded_line@N newline*)+
+escaped_folded_line = "\>" (escape | character)* nl
 ```
 
 **Warning**: Comments in block strings will be interpreted as a part of the string.
@@ -321,27 +321,29 @@ escaped_folded_line(N) = "\>"(N) (escape | character)* nl
 ## Total Language
 
 The language description uses a combination of RegEx and PEG notation.
-Rules on blocks use function call syntax to describe the indentation level of the block.
-Those rules may also contain predicates.
+The syntax `@N` means that the token it's aplied to must start at charno=N in the line.
+Rules that use context-dependent features like `@N` take context variables as an argument and are described with function-like syntax.
+Function-like Rules may have guard clauses.
 All `ws` is ignored.
 
 ```
-scdil = value | block(0)
+scdil(N) = newline* (value@N newline+ | block(N))
 value = scalar | composite
 scalar = null | bool | integer | float | string
 composite = sequence | mapping
 block(N) = block_sequence(N) | block_mapping(N) | block_string(N)
-block_sequence(N, M) where M>N = ("-"(N) (value newline+ | newline* block(M)))+
-block_mapping(N, M) where M>N = ((name | string)(N) ":" (value newline+ | newline* block(M)))+
+block_sequence(N, M) where M>N = ("-"@N scdil(M))+
+block_mapping(N, M) where M>N = ((name | string)@N ":" scdil(M))+
 block_string(N) = literal_lines(N) | folded_lines(N) | escaped_literal_lines(N) | escaped_folded_lines(N)
-literal_lines(N) = (literal_line(N) newline*)+
-literal_line(N) = "|"(N) character* nl
-folded_lines(N) = (folded_line(N) newline*)+
-folded_line(N) = ">"(N) character* nl
-escaped_literal_lines(N) = (escaped_literal_line(N) newline*)+
-escaped_literal_line(N) = "\|"(N) (escape | character)* nl
-escaped_folded_lines(N) = (escaped_folded_line(N) newline*)+
-escaped_folded_line(N) = "\>"(N) (escape | character)* nl
+literal_lines(N) = (literal_line@N newline*)+
+literal_line = "|" character* nl
+folded_lines(N) = (folded_line@N newline*)+
+folded_line = ">" character* nl
+escaped_literal_lines(N) = (escaped_literal_line@N newline*)+
+escaped_literal_line = "\|" (escape | character)* nl
+escaped_folded_lines(N) = (escaped_folded_line@N newline*)+
+escaped_folded_line = "\>" (escape | character)* nl
+
 escape = "\\" (
       "\\"
     | "/"
