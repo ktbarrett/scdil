@@ -3,48 +3,58 @@ from typing import List, Optional, Union
 
 
 @dataclass
-class Node:
-    ...
-
-
-@dataclass
-class SCDIL(Node):
-    node: Union["Structure", "Value"]
-
-
-@dataclass
-class Structure(Node):
-    ...
-
-
-@dataclass
-class Value(Node):
-    ...
-
-
-@dataclass
-class Token(Node):
+class Token:
     lineno: int
     charno: int
 
 
 @dataclass
-class Null(Value, Token):
-    ...
+class Null(Token):
+    value: None = None
 
 
 @dataclass
-class Boolean(Value, Token):
+class Boolean(Token):
     value: bool
 
 
 @dataclass
-class Number(Value, Token):
+class Integer(Token):
+    value: int
+
+
+@dataclass
+class Float(Token):
     value: float
 
 
 @dataclass
-class String(Value, Token):
+class String(Token):
+    value: str
+
+
+@dataclass
+class Name(Token):
+    value: str
+
+
+@dataclass
+class LiteralLine(Token):
+    value: str
+
+
+@dataclass
+class FoldedLine(Token):
+    value: str
+
+
+@dataclass
+class EscapedLiteralLine(Token):
+    value: str
+
+
+@dataclass
+class EscapedFoldedLine(Token):
     value: str
 
 
@@ -79,33 +89,14 @@ class Colon(Token):
 
 
 @dataclass
-class Name(Value, Token):
-    value: str
-
-
-@dataclass
 class Dash(Token):
     ...
 
 
-@dataclass
-class Pipe(Token):
-    ...
-
-
-@dataclass
-class Indent(Token):
-    ...
-
-
-@dataclass
-class Nodent(Token):
-    ...
-
-
-@dataclass
-class Dedent(Token):
-    ...
+SCDIL = Union["Value", "Block"]
+Value = Union["Composite", "Scalar"]
+Scalar = Union[Null, Boolean, Integer, Float, String]
+Composite = Union["Sequence", "Mapping"]
 
 
 @dataclass
@@ -115,7 +106,7 @@ class SequenceElement:
 
 
 @dataclass
-class Sequence(Value):
+class Sequence:
     lbracket: LBracket
     elements: List[SequenceElement]
     rbracket: RBracket
@@ -130,42 +121,58 @@ class MappingElement:
 
 
 @dataclass
-class Mapping(Value):
+class Mapping:
     lcurly: LCurly
     elements: List[MappingElement]
     rcurly: RCurly
 
 
+Block = Union["BlockMapping", "BlockSequence", "BlockString"]
+
+
 @dataclass
-class Section:
-    name: Name
+class BlockSequenceElement:
+    dash: Dash
+    value: SCDIL
+
+
+@dataclass
+class BlockSequence:
+    elements: List[BlockSequenceElement]
+
+
+@dataclass
+class BlockMappingElement:
+    name: Union[Name, String]
     colon: Colon
-    value: Value
-    nodent: Optional[Nodent]
+    value: SCDIL
 
 
 @dataclass
-class Sections(Structure):
-    indent: Indent
-    elements: List[Section]
-    dedent: Dedent
+class BlockMapping:
+    elements: List[BlockMappingElement]
+
+
+BlockString = Union[
+    "LiteralLines", "FoldedLines", "EscapedLiteralLines", "EscapedFoldedLines"
+]
 
 
 @dataclass
-class Item:
-    value: Value
-    nodent: Optional[Nodent]
+class LiteralLines:
+    lines: List[LiteralLine]
 
 
 @dataclass
-class Items(Structure):
-    indent: Indent
-    elements: List[Item]
-    dedent: Dedent
+class FoldedLines:
+    lines: List[FoldedLine]
 
 
 @dataclass
-class Paragraph(Structure):
-    indent: Indent
-    value: str
-    dedent: Dedent
+class EscapedLiteralLines:
+    lines: List[EscapedLiteralLine]
+
+
+@dataclass
+class EscapedFoldedLines:
+    lines: List[EscapedFoldedLine]
