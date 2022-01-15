@@ -67,11 +67,11 @@ def _(
     indent: str = " ",
 ) -> None:
     if value is math.inf:
-        stream.write(".Inf")
+        stream.write("inf")
     elif value is -math.inf:
-        stream.write("-.Inf")
+        stream.write("-inf")
     elif value is math.nan:
-        stream.write(".NaN")
+        stream.write("nan")
     else:
         stream.write(json.dumps(value))
 
