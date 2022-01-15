@@ -8,6 +8,7 @@ from typing import (
     KeysView,
     List,
     Mapping,
+    Protocol,
     Tuple,
     Type,
     TypeVar,
@@ -15,14 +16,22 @@ from typing import (
     overload,
 )
 
-from scdil.types import SupportsKeysAndGetItem
-
-K = TypeVar("K")
-V = TypeVar("V")
-V_co = TypeVar("V_co", covariant=True)
+_K = TypeVar("_K")
+_V = TypeVar("_V")
+_V_co = TypeVar("_V_co", covariant=True)
 
 
-class FrozenDict(Mapping[K, V_co]):
+class _SupportsKeysAndGetItem(Protocol[_K, _V_co]):
+    """ """
+
+    def keys(self) -> Iterable[_K]:
+        ...
+
+    def __getitem__(self, item: _K) -> _V_co:
+        ...
+
+
+class FrozenDict(Mapping[_K, _V_co]):
     """ """
 
     @overload
@@ -30,15 +39,17 @@ class FrozenDict(Mapping[K, V_co]):
         ...
 
     @overload
-    def __init__(self, **kwargs: V_co) -> None:
+    def __init__(self, **kwargs: _V_co) -> None:
         ...
 
     @overload
-    def __init__(self, __map: SupportsKeysAndGetItem[K, V_co], **kwargs: V_co) -> None:
+    def __init__(
+        self, __map: _SupportsKeysAndGetItem[_K, _V_co], **kwargs: _V_co
+    ) -> None:
         ...
 
     @overload
-    def __init__(self, __iterable: Iterable[Tuple[K, V_co]], **kwargs: V_co) -> None:
+    def __init__(self, __iterable: Iterable[Tuple[_K, _V_co]], **kwargs: _V_co) -> None:
         ...
 
     @overload
@@ -46,22 +57,22 @@ class FrozenDict(Mapping[K, V_co]):
         ...
 
     def __init__(self, *args, **kwargs):  # type: ignore
-        self._dict: Dict[K, V_co] = dict(*args, **kwargs)
+        self._dict: Dict[_K, _V_co] = dict(*args, **kwargs)
 
     @classmethod
-    def fromkeys(cls, __iterable: Iterable[K], __value: V) -> "FrozenDict[K, V]":
+    def fromkeys(cls, __iterable: Iterable[_K], __value: _V) -> "FrozenDict[_K, _V]":
         return FrozenDict(dict.fromkeys(__iterable, __value))
 
     def __len__(self) -> int:
         return len(self._dict)
 
-    def __getitem__(self, __item: K) -> V_co:
+    def __getitem__(self, __item: _K) -> _V_co:
         return self._dict[__item]
 
-    def __iter__(self) -> Iterator[K]:
+    def __iter__(self) -> Iterator[_K]:
         return iter(self._dict)
 
-    def __reversed__(self) -> Iterator[K]:
+    def __reversed__(self) -> Iterator[_K]:
         return reversed(self._dict)
 
     def __repr__(self) -> str:
@@ -75,16 +86,16 @@ class FrozenDict(Mapping[K, V_co]):
     def __hash__(self) -> int:
         return sum(hash(item) for item in self.items())
 
-    def copy(self) -> "FrozenDict[K, V_co]":
+    def copy(self) -> "FrozenDict[_K, _V_co]":
         return FrozenDict(self._dict.items())
 
-    def keys(self) -> KeysView[K]:
+    def keys(self) -> KeysView[_K]:
         return self._dict.keys()
 
-    def values(self) -> ValuesView[V_co]:
+    def values(self) -> ValuesView[_V_co]:
         return self._dict.values()
 
-    def items(self) -> ItemsView[K, V_co]:
+    def items(self) -> ItemsView[_K, _V_co]:
         return self._dict.items()
 
     if sys.version_info >= (3, 9):
@@ -92,26 +103,26 @@ class FrozenDict(Mapping[K, V_co]):
         # dict supports '|' with disjoint types;
         # but mypy has a really hard time handling this correctly, so I don't bother
         #
-        # def __or__(self, __other: Mapping[K2, V2]) -> "FrozenDict[K | K2, V_co | V2]":
-        def __or__(self, __other: Mapping[K, V_co]) -> "FrozenDict[K, V_co]":
+        # def __or__(self, __other: Mapping[K2, V2]) -> "FrozenDict[_K | K2, _V_co | V2]":
+        def __or__(self, __other: Mapping[_K, _V_co]) -> "FrozenDict[_K, _V_co]":
             if not isinstance(__other, Mapping):
                 return NotImplemented
             res = self.copy()
             res |= __other
             return res
 
-        def __ror__(self, __other: Mapping[K, V_co]) -> "FrozenDict[K, V_co]":
+        def __ror__(self, __other: Mapping[_K, _V_co]) -> "FrozenDict[_K, _V_co]":
             if not isinstance(__other, Mapping):
                 return NotImplemented
             res = self.copy()
             res |= __other
             return res
 
-        def __ior__(self, __other: Mapping[K, V_co]) -> "FrozenDict[K, V_co]":
+        def __ior__(self, __other: Mapping[_K, _V_co]) -> "FrozenDict[_K, _V_co]":
             self._dict |= __other
             return self
 
     def __class_getitem__(
-        cls: Type["FrozenDict[K, V_co]"], __item: Any
-    ) -> Type["FrozenDict[K, V_co]"]:
+        cls: Type["FrozenDict[_K, _V_co]"], __item: Any
+    ) -> Type["FrozenDict[_K, _V_co]"]:
         return cls

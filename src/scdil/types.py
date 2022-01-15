@@ -1,6 +1,5 @@
 from typing import (
     ItemsView,
-    Iterable,
     Iterator,
     KeysView,
     Optional,
@@ -13,12 +12,11 @@ from typing import (
 )
 
 T = TypeVar("T")
-T_co = TypeVar("T_co", covariant=True)
 
 # Recursive type aliases are not currently supported python/mypy#731
 #
-# SCDILValue = Union[None, bool, float, str, "Sequence[SCDILValue]", "Mapping[SCDILValue, SCDILValue]"]
-SCDILValue = Union[None, bool, float, str, "SCDILSequence", "SCDILMapping"]
+# SCDILValue = Union[None, bool, int, float, str, "Sequence[SCDILValue]", "Mapping[SCDILValue, SCDILValue]"]
+SCDILValue = Union[None, bool, int, float, str, "SCDILSequence", "SCDILMapping"]
 
 
 # Sequence and Mapping are not Protocols, so we can't just inherit
@@ -84,14 +82,4 @@ class SCDILMapping(Protocol):
         ...
 
     def items(self) -> ItemsView[SCDILValue, SCDILValue]:
-        ...
-
-
-class SupportsKeysAndGetItem(Protocol[T, T_co]):
-    """ """
-
-    def keys(self) -> Iterable[T]:
-        ...
-
-    def __getitem__(self, item: T) -> T_co:
         ...
