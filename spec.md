@@ -2,21 +2,22 @@
 
 ## Whitespace and Newlines
 
-Whitespace includes spaces (` `) *only*.
+Newlines include `\n`, `\r\n` and `\r` characters.
+Whitespace includes spaces (` `) and any newline characters.
 Tab characters are *not* allowable whitespace.
 Non-breaking spaces (U+00A0) are *not* allowable whitespace.
-
-Newlines include `\n`, `\r\n` and `\r` characters.
+All whitespace is ignored by the parser.
 
 **Parse Rules**
 ```
-ws = " "
+ws = " " | nl
 nl = "\n" | "\r\n" | "\r"
 ```
 
 ## Comments
 
 Comments start with `#` and run until the end of the line.
+Comments are ignored by the parser.
 
 **Examples**
 ```
@@ -26,7 +27,7 @@ a: 1  # this is also a comment
 
 **Parse Rules**
 ```
-comment = "#" (!nl | .)*
+comment = "#" (!nl .)*
 ```
 
 ## Scalar Types
@@ -191,7 +192,7 @@ Newlines are ignored as insignificant whitespace while parsing a sequence.
 
 **Parse Rules**
 ```
-sequence = "[" newline* (value newline* "," newline*)* (value newline* ","? newline*)? "]"
+sequence = "[" (value ",")* (value ","?)? "]"
 ```
 
 ### Mappings
@@ -211,7 +212,7 @@ Newlines are ignored as insignificant whitespace while parsing a mapping.
 
 **Parse Rules**
 ```
-mapping = "{" newline* (value newline* ":" newline* value newline* "," newline*)* (value newline* ":" newline* value newline* ","? newline*)? "}"
+mapping = "{" (value ":" value ",")* (value ":" value ","?)? "}"
 ```
 
 ## Blocks
@@ -306,14 +307,14 @@ b:
 **Parse Rules**
 ```
 block_string(N) = literal_lines(N) | folded_lines(N) | escaped_literal_lines(N) | escaped_folded_lines(N)
-literal_lines(N) = (literal_line@N newline*)+
-literal_line = "|" character* nl
-folded_lines(N) = (folded_line@N newline*)+
-folded_line = ">" character* nl
-escaped_literal_lines(N) = (escaped_literal_line@N newline*)+
-escaped_literal_line = "\|" (escape | character)* nl
-escaped_folded_lines(N) = (escaped_folded_line@N newline*)+
-escaped_folded_line = "\>" (escape | character)* nl
+literal_lines(N) = (literal_line@N)+
+literal_line = "|" character*
+folded_lines(N) = (folded_line@N)+
+folded_line = ">" character*
+escaped_literal_lines(N) = (escaped_literal_line@N)+
+escaped_literal_line = "\|" (escape | character)*
+escaped_folded_lines(N) = (escaped_folded_line@N)+
+escaped_folded_line = "\>" (escape | character)*
 ```
 
 **Warning**: Comments in block strings will be interpreted as a part of the string.
@@ -327,22 +328,22 @@ Function-like Rules may have guard clauses.
 All `ws` is ignored.
 
 ```
-scdil(N) = newline* (value@N newline+ | block(N))
+scdil = value | block(0)
 value = scalar | composite
 scalar = null | bool | integer | float | string
 composite = sequence | mapping
 block(N) = block_sequence(N) | block_mapping(N) | block_string(N)
-block_sequence(N, M) where M>N = ("-"@N scdil(M))+
-block_mapping(N, M) where M>N = ((name | string)@N ":" scdil(M))+
+block_sequence(N, M) where M>N = ("-"@N (value@M | block(M))+
+block_mapping(N, M) where M>N = ((name | string)@N ":" (value@M | block(M))+
 block_string(N) = literal_lines(N) | folded_lines(N) | escaped_literal_lines(N) | escaped_folded_lines(N)
-literal_lines(N) = (literal_line@N newline*)+
-literal_line = "|" character* nl
-folded_lines(N) = (folded_line@N newline*)+
-folded_line = ">" character* nl
-escaped_literal_lines(N) = (escaped_literal_line@N newline*)+
-escaped_literal_line = "\|" (escape | character)* nl
-escaped_folded_lines(N) = (escaped_folded_line@N newline*)+
-escaped_folded_line = "\>" (escape | character)* nl
+literal_lines(N) = (literal_line@N)+
+literal_line = "|" character*
+folded_lines(N) = (folded_line@N)+
+folded_line = ">" character*
+escaped_literal_lines(N) = (escaped_literal_line@N)+
+escaped_literal_line = "\|" (escape | character)*
+escaped_folded_lines(N) = (escaped_folded_line@N)+
+escaped_folded_line = "\>" (escape | character)*
 
 escape = "\\" (
       "\\"
@@ -371,10 +372,9 @@ exponent = "[eE]" "[+-]"? "[0-9]"+
 string = "\"" (escape | (!"\"" character))* "\""
 name = letter (letter | "[0-9]")*
 letter = "[_a-zA-Z\U000000A0-\U0010FFFF]"
-sequence = "[" newline* (value newline* "," newline*)* (value newline* ","? newline*)? "]"
-mapping = "{" newline* (value newline* ":" newline* value newline* "," newline*)* (value newline* ":" newline* value newline* ","? newline*)? "}"
-ws = " "
+sequence = "[" (value "," )* (value ","? )? "]"
+mapping = "{" (value ":" value "," )* (value ":" value ","? )? "}"
+ws = " " | nl
 nl = "\n" | "\r\n" | "\r"
-comment = "#" (!nl | .)*
-newline = comment? nl
+comment = "#" (!nl .)*
 ```
