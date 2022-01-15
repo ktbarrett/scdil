@@ -34,7 +34,7 @@ comment = "#" (!nl .)*
 
 **Parse Rules**
 ```
-scalar = null / boolean / integer / float / string
+scalar = null | boolean | integer | float | string
 ```
 
 ### `null`
@@ -48,7 +48,7 @@ null = "null"
 
 **Parse Rules**
 ```
-boolean = "true" / "false".
+boolean = "true" | "false".
 ```
 
 ### Integers
@@ -162,7 +162,7 @@ Strings are a sequence of characters or escape code delimited with `"` character
 
 **Parse Rules**
 ```
-string = "\"" (escape | (!"\"" character))* "\""
+string = "\"" (escape | !"\"" character)* "\""
 ```
 
 ## Composite Types
@@ -244,7 +244,8 @@ Each element in the sequence starts on a different line with the `-` character.
 
 **Parse Rules**
 ```
-block_sequence(N, M) where M>N = ("-"@N scdil(M))+
+block_sequence(N) = block_sequence_element(N, _)+
+block_sequence_element(N, M) where M>N = "-"@N scdil(M)
 ```
 
 ### Block Mappings
@@ -266,7 +267,8 @@ b:            # start block on the next line
 
 **Parse Rules**
 ```
-block_mapping(N, M) where M>N = ((name | string)@N ":" scdil(M))+
+block_mapping(N) = block_mapping_element(N, _)+
+block_mapping_element(N, M) where M>N = (name | string)@N ":" scdil(M)
 name = letter (letter | "[0-9]")*
 letter = "[_a-zA-Z\U000000A0-\U0010FFFF]"
 ```
@@ -333,8 +335,10 @@ value = scalar | composite
 scalar = null | bool | integer | float | string
 composite = sequence | mapping
 block(N) = block_sequence(N) | block_mapping(N) | block_string(N)
-block_sequence(N, M) where M>N = ("-"@N (value@M | block(M))+
-block_mapping(N, M) where M>N = ((name | string)@N ":" (value@M | block(M))+
+block_sequence(N) = block_sequence_element(N, _)+
+block_sequence_element(N, M) where M>N = "-"@N scdil(M)
+block_mapping(N) = block_mapping_element(N, _)+
+block_mapping_element(N, M) where M>N = (name | string)@N ":" scdil(M)
 block_string(N) = literal_lines(N) | folded_lines(N) | escaped_literal_lines(N) | escaped_folded_lines(N)
 literal_lines(N) = (literal_line@N)+
 literal_line = "|" character*
@@ -361,15 +365,15 @@ escape = "\\" (
 character = "[\U00000020-\U0000007E\U000000A0-\U0010FFFF]"
 null = "null"
 bool = "true" | "false"
-integer = "[+-]"? (decimal_literal | hex_literal | octal_literal | binary_literal)
+integer = "[+-]"? ("0" | decimal_literal | hex_literal | octal_literal | binary_literal)
 decimal_literal = "[1-9]" "[0-9]"*
 hex_literal = "0[xX]" "[0-9a-fA-F]"+
 octal_literal = "0[oO]" "[0-7]"+
 binary_literal = "0[bB]" "[01]"+
-float = int (fractional exponent? | exponent) | "[+-]"? "inf" | "nan"
+float = integer (fractional exponent? | exponent) | "[+-]"? "inf" | "nan"
 fractional = "." "[0-9]"*
 exponent = "[eE]" "[+-]"? "[0-9]"+
-string = "\"" (escape | (!"\"" character))* "\""
+string = "\"" (escape | !"\"" character)* "\""
 name = letter (letter | "[0-9]")*
 letter = "[_a-zA-Z\U000000A0-\U0010FFFF]"
 sequence = "[" (value "," )* (value ","? )? "]"
