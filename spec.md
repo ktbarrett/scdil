@@ -327,28 +327,39 @@ The language description uses a combination of RegEx and PEG notation.
 The syntax `@N` means that the token it's aplied to must start at charno=N in the line.
 Rules that use context-dependent features like `@N` take context variables as an argument and are described with function-like syntax.
 Function-like Rules may have guard clauses.
-All `ws` is ignored.
 
+**Nodes**
 ```
-scdil = value | block(0)
-value = scalar | composite
-scalar = null | bool | integer | float | string
-composite = sequence | mapping
+scdil(N) = value(N) | block(N)
+value(N) = scalar(N) | composite(N)
+scalar(N) = null@N | bool@N | integer@N | float@N | string@N
+composite(N) = sequence(N) | mapping(N)
+sequence(N) = lbracket@N (value comma)* (value comma?)? rbracket
+mapping(N) = lcurly@N (value colon value comma)* (value colon value comma?)? rcurly
 block(N) = block_sequence(N) | block_mapping(N) | block_string(N)
 block_sequence(N) = block_sequence_element(N, _)+
-block_sequence_element(N, M) where M>N = "-"@N scdil(M)
+block_sequence_element(N, M) where M>N = dash@N scdil(M))
 block_mapping(N) = block_mapping_element(N, _)+
-block_mapping_element(N, M) where M>N = (name | string)@N ":" scdil(M)
+block_mapping_element(N, M) where M>N = (name | string)@N colon scdil(M))
 block_string(N) = literal_lines(N) | folded_lines(N) | escaped_literal_lines(N) | escaped_folded_lines(N)
 literal_lines(N) = (literal_line@N)+
-literal_line = "|" character*
 folded_lines(N) = (folded_line@N)+
-folded_line = ">" character*
 escaped_literal_lines(N) = (escaped_literal_line@N)+
-escaped_literal_line = "\|" (escape | character)*
 escaped_folded_lines(N) = (escaped_folded_line@N)+
-escaped_folded_line = "\>" (escape | character)*
+```
 
+**Tokens and Character Sets**
+```
+null = "null"
+bool = "true" | "false"
+integer = "[+-]"? ("0" | decimal_literal | hex_literal | octal_literal | binary_literal)
+decimal_literal = "[1-9]" "[0-9]"*
+hex_literal = "0" "[xX]" "[0-9A-Fa-f]"+
+octal_literal = "0" "[oO]" "[0-7]"+
+binary_literal = "0" "[bB]" "[01]"+
+float = integer (fractional exponent? | exponent) | "[+-]"? "inf" | "nan"
+fractional = "." "[0-9]"*
+exponent = "[eE]" "[+-]"? "[0-9]"+
 escape = "\\" (
       "\\"
     | "/"
@@ -363,21 +374,24 @@ escape = "\\" (
     | "U" "[0-9a-fA-F]"^8
 )
 character = "[\U00000020-\U0000007E\U000000A0-\U0010FFFF]"
-null = "null"
-bool = "true" | "false"
-integer = "[+-]"? ("0" | decimal_literal | hex_literal | octal_literal | binary_literal)
-decimal_literal = "[1-9]" "[0-9]"*
-hex_literal = "0[xX]" "[0-9a-fA-F]"+
-octal_literal = "0[oO]" "[0-7]"+
-binary_literal = "0[bB]" "[01]"+
-float = integer (fractional exponent? | exponent) | "[+-]"? "inf" | "nan"
-fractional = "." "[0-9]"*
-exponent = "[eE]" "[+-]"? "[0-9]"+
 string = "\"" (escape | !"\"" character)* "\""
 name = letter (letter | "[0-9]")*
 letter = "[_a-zA-Z\U000000A0-\U0010FFFF]"
-sequence = "[" (value "," )* (value ","? )? "]"
-mapping = "{" (value ":" value "," )* (value ":" value ","? )? "}"
+literal_line = "|" character*
+folded_line = ">" character*
+escaped_literal_line = "\|" (escape | character)*
+escaped_folded_line = "\>" (escape | character)*
+lbracket = "["
+rbracket = "]"
+lcurly = "{"
+rcurly = "}"
+colon = ":"
+comma = ","
+dash = "-"
+```
+
+**Ignored**
+```
 ws = " " | nl
 nl = "\n" | "\r\n" | "\r"
 comment = "#" (!nl .)*
