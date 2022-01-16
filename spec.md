@@ -364,8 +364,8 @@ escaped_folded_lines(N) = (escaped_folded_line@N)+
 ```
 null = "null"
 boolean = "true" | "false"
-integer = "[+-]"? ("0" | decimal_literal | hex_literal | octal_literal | binary_literal)
-decimal_literal = "[1-9]" "[0-9]"*
+integer = decimal_literal | hex_literal | octal_literal | binary_literal
+decimal_literal = "[+-]"? "[0-9]"+
 hex_literal = "0" "[xX]" "[0-9A-Fa-f]"+
 octal_literal = "0" "[oO]" "[0-7]"+
 binary_literal = "0" "[bB]" "[01]"+
