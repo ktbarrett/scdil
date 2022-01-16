@@ -101,7 +101,7 @@ nan
 
 **Parse Rules**
 ```
-float = integer (fractional exponent? | exponent) | "[+-]"? "inf" | "nan"
+float = decimal_literal (fractional exponent? | exponent) | "[+-]"? "inf" | "nan"
 fractional = "." "[0-9]"*
 exponent = "[eE]" "[+-]"? "[0-9]"+
 ```
@@ -369,7 +369,7 @@ decimal_literal = "[1-9]" "[0-9]"*
 hex_literal = "0" "[xX]" "[0-9A-Fa-f]"+
 octal_literal = "0" "[oO]" "[0-7]"+
 binary_literal = "0" "[bB]" "[01]"+
-float = integer (fractional exponent? | exponent) | "[+-]"? "inf" | "nan"
+float = decimal_literal (fractional exponent? | exponent) | "[+-]"? "inf" | "nan"
 fractional = "." "[0-9]"*
 exponent = "[eE]" "[+-]"? "[0-9]"+
 character = "[\U00000020-\U0000007E\U000000A0-\U0010FFFF]"
