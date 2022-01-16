@@ -1,6 +1,15 @@
 # Simple Configuration and Data Interchange Language Specification
 
-## Whitespace and Newlines
+**Parse Rules**
+```
+scdil() variable N = node(N)
+```
+
+## Ignored Productions
+
+Whitespace and comments are ignored by the parser.
+
+### Whitespace and Newlines
 
 Newlines include `\n`, `\r\n` and `\r` characters.
 Whitespace includes spaces (` `) and any newline characters.
@@ -14,7 +23,7 @@ ws = " " | nl
 nl = "\n" | "\r\n" | "\r"
 ```
 
-## Comments
+### Comments
 
 Comments start with `#` and run until the end of the line.
 Comments are ignored by the parser.
@@ -34,7 +43,7 @@ comment = "#" (!nl .)*
 
 **Parse Rules**
 ```
-scalar = null | boolean | integer | float | string
+scalar(N) = null@N | boolean@N | integer@N | float@N | string@N
 ```
 
 ### `null`
@@ -173,7 +182,8 @@ Whitespace is not significant inside of a composite.
 
 **Parse Rules**
 ```
-composite = sequence / mapping
+composite(N) = sequence(N) | mapping(N)
+value(N) = scalar(N) | composite(N)
 ```
 
 ### Sequences
@@ -192,7 +202,7 @@ Newlines are ignored as insignificant whitespace while parsing a sequence.
 
 **Parse Rules**
 ```
-sequence = "[" (value ",")* (value ","?)? "]"
+sequence(N) = "["@N (value(_) ",")* (value(_) ","?)? "]"
 ```
 
 ### Mappings
@@ -212,7 +222,7 @@ Newlines are ignored as insignificant whitespace while parsing a mapping.
 
 **Parse Rules**
 ```
-mapping = "{" (value ":" value ",")* (value ":" value ","?)? "}"
+mapping(N) = "{"@N (value(_) ":" value(_) ",")* (value(_) ":" value(_) ","?)? "}"
 ```
 
 ## Blocks
@@ -225,6 +235,7 @@ Each element of a block must start on the next non-empty line.
 **Parse Rules**
 ```
 block(N) = block_sequence(N) | block_mapping(N) | block_string(N)
+node(N) = value(N) | block(N)
 ```
 
 ### Block Sequences
@@ -244,8 +255,8 @@ Each element in the sequence starts on a different line with the `-` character.
 
 **Parse Rules**
 ```
-block_sequence(N) = block_sequence_element(N, _)+
-block_sequence_element(N, M) where M>N = "-"@N scdil(M)
+block_sequence(N) = block_sequence_element(N)+
+block_sequence_element(N) variable M where M>N = "-"@N node(M))
 ```
 
 ### Block Mappings
@@ -267,8 +278,8 @@ b:            # start block on the next line
 
 **Parse Rules**
 ```
-block_mapping(N) = block_mapping_element(N, _)+
-block_mapping_element(N, M) where M>N = (name | string)@N ":" scdil(M)
+block_mapping(N) = block_mapping_element(N)+
+block_mapping_element(N) variable M where M>N = (name@N | string@N) ":" node(M))
 name = letter (letter | "[0-9]")*
 letter = "[_a-zA-Z\U000000A0-\U0010FFFF]"
 ```
@@ -310,12 +321,12 @@ b:
 ```
 block_string(N) = literal_lines(N) | folded_lines(N) | escaped_literal_lines(N) | escaped_folded_lines(N)
 literal_lines(N) = (literal_line@N)+
-literal_line = "|" character*
 folded_lines(N) = (folded_line@N)+
-folded_line = ">" character*
 escaped_literal_lines(N) = (escaped_literal_line@N)+
-escaped_literal_line = "\|" (escape | character)*
 escaped_folded_lines(N) = (escaped_folded_line@N)+
+literal_line = "|" character*
+folded_line = ">" character*
+escaped_literal_line = "\|" (escape | character)*
 escaped_folded_line = "\>" (escape | character)*
 ```
 
@@ -326,21 +337,22 @@ escaped_folded_line = "\>" (escape | character)*
 The language description uses a combination of RegEx and PEG notation.
 The syntax `@N` means that the token it's aplied to must start at charno=N in the line.
 Rules that use context-dependent features like `@N` take context variables as an argument and are described with function-like syntax.
-Function-like Rules may have guard clauses.
+Function-like Rules may have variables and guard clauses.
 
 **Nodes**
 ```
-scdil(N) = value(N) | block(N)
+scdil() variable N = node(N)
+node(N) = value(N) | block(N)
 value(N) = scalar(N) | composite(N)
-scalar(N) = null@N | bool@N | integer@N | float@N | string@N
+scalar(N) = null@N | boolean@N | integer@N | float@N | string@N
 composite(N) = sequence(N) | mapping(N)
-sequence(N) = lbracket@N (value comma)* (value comma?)? rbracket
-mapping(N) = lcurly@N (value colon value comma)* (value colon value comma?)? rcurly
+sequence(N) = "["@N (value(_) ",")* (value(_) ","?)? "]"
+mapping(N) = "{"@N (value(_) ":" value(_) ",")* (value(_) ":" value(_) ","?)? "}"
 block(N) = block_sequence(N) | block_mapping(N) | block_string(N)
-block_sequence(N) = block_sequence_element(N, _)+
-block_sequence_element(N, M) where M>N = dash@N scdil(M))
-block_mapping(N) = block_mapping_element(N, _)+
-block_mapping_element(N, M) where M>N = (name | string)@N colon scdil(M))
+block_sequence(N) = block_sequence_element(N)+
+block_sequence_element(N) variable M where M>N = "-"@N node(M))
+block_mapping(N) = block_mapping_element(N)+
+block_mapping_element(N) variable M where M>N = (name@N | string@N) ":" node(M))
 block_string(N) = literal_lines(N) | folded_lines(N) | escaped_literal_lines(N) | escaped_folded_lines(N)
 literal_lines(N) = (literal_line@N)+
 folded_lines(N) = (folded_line@N)+
@@ -351,7 +363,7 @@ escaped_folded_lines(N) = (escaped_folded_line@N)+
 **Tokens and Character Sets**
 ```
 null = "null"
-bool = "true" | "false"
+boolean = "true" | "false"
 integer = "[+-]"? ("0" | decimal_literal | hex_literal | octal_literal | binary_literal)
 decimal_literal = "[1-9]" "[0-9]"*
 hex_literal = "0" "[xX]" "[0-9A-Fa-f]"+
@@ -360,6 +372,7 @@ binary_literal = "0" "[bB]" "[01]"+
 float = integer (fractional exponent? | exponent) | "[+-]"? "inf" | "nan"
 fractional = "." "[0-9]"*
 exponent = "[eE]" "[+-]"? "[0-9]"+
+character = "[\U00000020-\U0000007E\U000000A0-\U0010FFFF]"
 escape = "\\" (
       "\\"
     | "/"
@@ -373,7 +386,6 @@ escape = "\\" (
     | "u" "[0-9a-fA-F]"^4
     | "U" "[0-9a-fA-F]"^8
 )
-character = "[\U00000020-\U0000007E\U000000A0-\U0010FFFF]"
 string = "\"" (escape | !"\"" character)* "\""
 name = letter (letter | "[0-9]")*
 letter = "[_a-zA-Z\U000000A0-\U0010FFFF]"
@@ -381,13 +393,6 @@ literal_line = "|" character*
 folded_line = ">" character*
 escaped_literal_line = "\|" (escape | character)*
 escaped_folded_line = "\>" (escape | character)*
-lbracket = "["
-rbracket = "]"
-lcurly = "{"
-rcurly = "}"
-colon = ":"
-comma = ","
-dash = "-"
 ```
 
 **Ignored**

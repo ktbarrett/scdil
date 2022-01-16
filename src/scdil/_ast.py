@@ -93,10 +93,18 @@ class Dash(Token):
     ...
 
 
-SCDIL = Union["Value", "Block"]
+Node = Union["Value", "Block"]
 Value = Union["Composite", "Scalar"]
-Scalar = Union[Null, Boolean, Integer, Float, String]
 Composite = Union["Sequence", "Mapping"]
+
+
+@dataclass
+class Scalar:
+    value: Union[Null, Boolean, Integer, Float, String]
+
+    @property
+    def N(self) -> int:
+        return self.value.charno
 
 
 @dataclass
@@ -110,6 +118,10 @@ class Sequence:
     lbracket: LBracket
     elements: List[SequenceElement]
     rbracket: RBracket
+
+    @property
+    def N(self) -> int:
+        return self.lbracket.charno
 
 
 @dataclass
@@ -126,6 +138,10 @@ class Mapping:
     elements: List[MappingElement]
     rcurly: RCurly
 
+    @property
+    def N(self) -> int:
+        return self.lcurly.charno
+
 
 Block = Union["BlockMapping", "BlockSequence", "BlockString"]
 
@@ -133,24 +149,40 @@ Block = Union["BlockMapping", "BlockSequence", "BlockString"]
 @dataclass
 class BlockSequenceElement:
     dash: Dash
-    value: SCDIL
+    value: Node
+
+    @property
+    def N(self) -> int:
+        return self.dash.charno
 
 
 @dataclass
 class BlockSequence:
     elements: List[BlockSequenceElement]
 
+    @property
+    def N(self) -> int:
+        return self.elements[0].N
+
 
 @dataclass
 class BlockMappingElement:
     name: Union[Name, String]
     colon: Colon
-    value: SCDIL
+    value: Node
+
+    @property
+    def N(self) -> int:
+        return self.name.charno
 
 
 @dataclass
 class BlockMapping:
     elements: List[BlockMappingElement]
+
+    @property
+    def N(self) -> int:
+        return self.elements[0].N
 
 
 BlockString = Union[
@@ -162,17 +194,33 @@ BlockString = Union[
 class LiteralLines:
     lines: List[LiteralLine]
 
+    @property
+    def N(self) -> int:
+        return self.lines[0].charno
+
 
 @dataclass
 class FoldedLines:
     lines: List[FoldedLine]
+
+    @property
+    def N(self) -> int:
+        return self.lines[0].charno
 
 
 @dataclass
 class EscapedLiteralLines:
     lines: List[EscapedLiteralLine]
 
+    @property
+    def N(self) -> int:
+        return self.lines[0].charno
+
 
 @dataclass
 class EscapedFoldedLines:
     lines: List[EscapedFoldedLine]
+
+    @property
+    def N(self) -> int:
+        return self.lines[0].charno
