@@ -3,14 +3,19 @@ from typing import List, Optional, Union
 
 
 @dataclass
-class Token:
+class Position:
     lineno: int
     charno: int
 
 
 @dataclass
+class Token:
+    position: Position
+
+
+@dataclass
 class Null(Token):
-    value: None = None
+    value: None
 
 
 @dataclass
@@ -104,7 +109,7 @@ class Scalar:
 
     @property
     def N(self) -> int:
-        return self.value.charno
+        return self.value.position.charno
 
 
 @dataclass
@@ -121,7 +126,7 @@ class Sequence:
 
     @property
     def N(self) -> int:
-        return self.lbracket.charno
+        return self.lbracket.position.charno
 
 
 @dataclass
@@ -140,7 +145,7 @@ class Mapping:
 
     @property
     def N(self) -> int:
-        return self.lcurly.charno
+        return self.lcurly.position.charno
 
 
 Block = Union["BlockMapping", "BlockSequence", "BlockString"]
@@ -153,7 +158,7 @@ class BlockSequenceElement:
 
     @property
     def N(self) -> int:
-        return self.dash.charno
+        return self.dash.position.charno
 
 
 @dataclass
@@ -173,7 +178,7 @@ class BlockMappingElement:
 
     @property
     def N(self) -> int:
-        return self.name.charno
+        return self.name.position.charno
 
 
 @dataclass
@@ -196,7 +201,7 @@ class LiteralLines:
 
     @property
     def N(self) -> int:
-        return self.lines[0].charno
+        return self.lines[0].position.charno
 
 
 @dataclass
@@ -205,7 +210,7 @@ class FoldedLines:
 
     @property
     def N(self) -> int:
-        return self.lines[0].charno
+        return self.lines[0].position.charno
 
 
 @dataclass
@@ -214,7 +219,7 @@ class EscapedLiteralLines:
 
     @property
     def N(self) -> int:
-        return self.lines[0].charno
+        return self.lines[0].position.charno
 
 
 @dataclass
@@ -223,4 +228,4 @@ class EscapedFoldedLines:
 
     @property
     def N(self) -> int:
-        return self.lines[0].charno
+        return self.lines[0].position.charno
