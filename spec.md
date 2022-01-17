@@ -75,10 +75,10 @@ boolean = "true" | "false".
 **Parse Rules**
 ```
 integer = "[+-]"? ("0" | decimal_literal | hex_literal | octal_literal | binary_literal)
-decimal_literal = "[1-9]" "[0-9]"*
-hex_literal = "0" "[xX]" "[0-9A-Fa-f]"+
-octal_literal = "0" "[oO]" "[0-7]"+
-binary_literal = "0" "[bB]" "[01]"+
+decimal_literal = "[+-]?[0-9]+"
+hex_literal = "0[xX][0-9A-Fa-f]+"
+octal_literal = "0[oO][0-7]+"
+binary_literal = "0[bB][01]+"
 ```
 
 **Implementation Note**: Integers are preferably arbitrary-precision integers,
@@ -101,9 +101,9 @@ nan
 
 **Parse Rules**
 ```
-float = decimal_literal (fractional exponent? | exponent) | "[+-]"? "inf" | "nan"
-fractional = "." "[0-9]"*
-exponent = "[eE]" "[+-]"? "[0-9]"+
+float = decimal_literal (fractional exponent? | exponent) | "[+-]?inf" | "nan"
+fractional = "\.[0-9]*"
+exponent = "[eE][+-]?[0-9]+"
 ```
 
 **Implementation Note**: Floats natively are preferably double-precision IEEE754 floating point numbers;
@@ -143,19 +143,17 @@ While this breaks JSON support, it is intentional.
 **Parse Rules**
 ```
 character = "[\U00000020-\U0000007E\U000000A0-\U0010FFFF]"
-escape = "\\" (
-      "\\"
-    | "/"
-    | """
-    | "b"
-    | "f"
-    | "n"
-    | "r"
-    | "t"
-    | "x" "[0-9A-Fa-f]"^2
-    | "u" "[0-9A-Fa-f]"^4
-    | "U" "[0-9A-Fa-f]"^8
-)
+escape = "\\\\"
+       | "\\/"
+       | "\\\"
+       | "\\b"
+       | "\\f"
+       | "\\n"
+       | "\\r"
+       | "\\t"
+       | "\\x[0-9a-fA-F]{2}"
+       | "\\u[0-9a-fA-F]{4}"
+       | "\\U[0-9a-fA-F]{8}"
 ```
 
 ### Strings
@@ -324,10 +322,10 @@ literal_lines(N) = (literal_line@N)+
 folded_lines(N) = (folded_line@N)+
 escaped_literal_lines(N) = (escaped_literal_line@N)+
 escaped_folded_lines(N) = (escaped_folded_line@N)+
-literal_line = "|" character*
+literal_line = "\|" character*
 folded_line = ">" character*
-escaped_literal_line = "\|" (escape | character)*
-escaped_folded_line = "\>" (escape | character)*
+escaped_literal_line = "\\\|" (escape | character)*
+escaped_folded_line = "\\>" (escape | character)*
 ```
 
 **Warning**: Comments in block strings will be interpreted as a part of the string.
@@ -365,34 +363,32 @@ escaped_folded_lines(N) = (escaped_folded_line@N)+
 null = "null"
 boolean = "true" | "false"
 integer = decimal_literal | hex_literal | octal_literal | binary_literal
-decimal_literal = "[+-]"? "[0-9]"+
-hex_literal = "0" "[xX]" "[0-9A-Fa-f]"+
-octal_literal = "0" "[oO]" "[0-7]"+
-binary_literal = "0" "[bB]" "[01]"+
-float = decimal_literal (fractional exponent? | exponent) | "[+-]"? "inf" | "nan"
-fractional = "." "[0-9]"*
-exponent = "[eE]" "[+-]"? "[0-9]"+
+decimal_literal = "[+-]?[0-9]+"
+hex_literal = "0[xX][0-9A-Fa-f]+"
+octal_literal = "0[oO][0-7]+"
+binary_literal = "0[bB][01]+"
+float = decimal_literal (fractional exponent? | exponent) | "[+-]?inf" | "nan"
+fractional = "\.[0-9]*"
+exponent = "[eE][+-]?[0-9]+"
 character = "[\U00000020-\U0000007E\U000000A0-\U0010FFFF]"
-escape = "\\" (
-      "\\"
-    | "/"
-    | """
-    | "b"
-    | "f"
-    | "n"
-    | "r"
-    | "t"
-    | "x" "[0-9a-fA-F]"^2
-    | "u" "[0-9a-fA-F]"^4
-    | "U" "[0-9a-fA-F]"^8
-)
+escape = "\\\\"
+       | "\\/"
+       | "\\\"
+       | "\\b"
+       | "\\f"
+       | "\\n"
+       | "\\r"
+       | "\\t"
+       | "\\x[0-9a-fA-F]{2}"
+       | "\\u[0-9a-fA-F]{4}"
+       | "\\U[0-9a-fA-F]{8}"
 string = "\"" (escape | !"\"" character)* "\""
 name = letter (letter | "[0-9]")*
 letter = "[_a-zA-Z\U000000A0-\U0010FFFF]"
-literal_line = "|" character*
+literal_line = "\|" character*
 folded_line = ">" character*
-escaped_literal_line = "\|" (escape | character)*
-escaped_folded_line = "\>" (escape | character)*
+escaped_literal_line = "\\\|" (escape | character)*
+escaped_folded_line = "\\>" (escape | character)*
 ```
 
 **Ignored**
