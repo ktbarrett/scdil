@@ -7,20 +7,30 @@ TokenT = TypeVar("TokenT", bound=ast.Token)
 
 
 class ParseError(Exception):
-    ...
+    def __init__(self, position: ast.Position, msg: str) -> None:
+        self.position = position
+        super().__init__(f"{position.lineno}:{position.charno}: {msg}")
 
 
 class Parser:
     def __init__(self, stream: TextIO) -> None:
         self.lexer = Lexer(stream)
+        self.curr: Optional[ast.Token] = None
         self.lookahead: Optional[ast.Token] = None
+
+    @property
+    def position(self) -> ast.Position:
+        if self.curr is None:
+            return ast.Position(-1, -1)
+        else:
+            return self.curr.position
 
     def parse(self) -> Optional[ast.Node]:
         if (parse := self.parse_node(None)) is not None:
-            if self.peek_tok() is None:
+            if self.peek() is None:
                 return parse
             else:
-                raise ParseError("Expected end of end of token stream")
+                raise ParseError(self.position, "Expected end of token stream")
         else:
             return None
 
@@ -41,11 +51,11 @@ class Parser:
             return None
 
     def parse_scalar(self, N: Optional[int]) -> Optional[ast.Scalar]:
-        value = self.peek_tok()
+        value = self.peek()
         if isinstance(
             value, (ast.Null, ast.Boolean, ast.Integer, ast.Float, ast.String)
-        ) and self.check_N(value, N):
-            _ = self.next_tok()
+        ) and check_token_N(value, N):
+            _ = self.next()
             return ast.Scalar(value)
         else:
             return None
@@ -59,10 +69,10 @@ class Parser:
             return None
 
     def parse_sequence(self, N: Optional[int]) -> Optional[ast.Sequence]:
-        if isinstance(lbracket := self.peek_tok(), ast.LBracket) and self.check_N(
+        if isinstance(lbracket := self.peek(), ast.LBracket) and check_token_N(
             lbracket, N
         ):
-            _ = self.next_tok()
+            _ = self.next()
             elements: List[ast.SequenceElement] = []
             while True:
                 if (element := self.parse_sequence_element()) is None:
@@ -71,8 +81,11 @@ class Parser:
                     elements.append(element)
                 if element.comma is None:
                     break
-            if not isinstance(rbracket := self.next_tok(), ast.RBracket):
-                raise ParseError(...)
+            if not isinstance(rbracket := self.next(), ast.RBracket):
+                raise ParseError(
+                    self.position,
+                    f"Expected a ']' after last element in sequence, got {rbracket!r}",
+                )
             else:
                 return ast.Sequence(lbracket, elements, rbracket)
         else:
@@ -81,20 +94,15 @@ class Parser:
     def parse_sequence_element(self) -> Optional[ast.SequenceElement]:
         if (value := self.parse_value(None)) is None:
             return None
-        if isinstance(comma := self.peek_tok(), ast.Comma):
-            _ = self.next_tok()
+        if isinstance(comma := self.peek(), ast.Comma):
+            _ = self.next()
         else:
             comma = None
-        return ast.SequenceElement(
-            value=value,
-            comma=comma,
-        )
+        return ast.SequenceElement(value, comma)
 
     def parse_mapping(self, N: Optional[int]) -> Optional[ast.Mapping]:
-        if isinstance(lcurly := self.peek_tok(), ast.LCurly) and self.check_N(
-            lcurly, N
-        ):
-            _ = self.next_tok()
+        if isinstance(lcurly := self.peek(), ast.LCurly) and check_token_N(lcurly, N):
+            _ = self.next()
             elements: List[ast.MappingElement] = []
             while True:
                 if (element := self.parse_mapping_element()) is None:
@@ -103,8 +111,11 @@ class Parser:
                     elements.append(element)
                 if element.comma is None:
                     break
-            if not isinstance(rcurly := self.next_tok(), ast.RCurly):
-                raise ParseError(...)
+            if not isinstance(rcurly := self.next(), ast.RCurly):
+                raise ParseError(
+                    self.position,
+                    f"Expected a '}}' after last element in mapping, got {rcurly!r}",
+                )
             else:
                 return ast.Mapping(lcurly, elements, rcurly)
         else:
@@ -113,20 +124,21 @@ class Parser:
     def parse_mapping_element(self) -> Optional[ast.MappingElement]:
         if (key := self.parse_value(None)) is None:
             return None
-        if not isinstance(colon := self.next_tok(), ast.Colon):
-            raise ParseError(...)
+        if not isinstance(colon := self.next(), ast.Colon):
+            raise ParseError(
+                self.position,
+                f"Expected a ':' after key in mapping element, got {colon!r}",
+            )
         if (value := self.parse_value(None)) is None:
-            raise ParseError(...)
-        if isinstance(comma := self.peek_tok(), ast.Comma):
-            _ = self.next_tok()
+            raise ParseError(
+                self.position,
+                f"Expected a value after ':' in mapping element, got {self.peek()!r}",
+            )
+        if isinstance(comma := self.peek(), ast.Comma):
+            _ = self.next()
         else:
             comma = None
-        return ast.MappingElement(
-            key=key,
-            colon=colon,
-            value=value,
-            comma=comma,
-        )
+        return ast.MappingElement(key, colon, value, comma)
 
     def parse_block(self, N: Optional[int]) -> Optional[ast.Block]:
         if (block1 := self.parse_block_sequence(N)) is not None:
@@ -153,11 +165,14 @@ class Parser:
     def parse_block_sequence_element(
         self, N: Optional[int]
     ) -> Optional[ast.BlockSequenceElement]:
-        if isinstance(dash := self.peek_tok(), ast.Dash) and self.check_N(dash, N):
-            _ = self.next_tok()
-            if (node := self.parse_node(None)) is None:
-                raise ParseError(...)
-            return ast.BlockSequenceElement(dash, node)
+        if isinstance(dash := self.peek(), ast.Dash) and check_token_N(dash, N):
+            _ = self.next()
+            if (value := self.parse_node(None)) is None:
+                raise ParseError(
+                    self.position,
+                    f"Expected a value to begin block sequence element, got {self.peek()!r}",
+                )
+            return ast.BlockSequenceElement(dash, value)
         else:
             return None
 
@@ -176,15 +191,21 @@ class Parser:
     def parse_block_mapping_element(
         self, N: Optional[int]
     ) -> Optional[ast.BlockMappingElement]:
-        if isinstance(name := self.peek_tok(), (ast.Name, ast.String)) and self.check_N(
+        if isinstance(name := self.peek(), (ast.Name, ast.String)) and check_token_N(
             name, N
         ):
-            _ = self.next_tok()
-            if not isinstance(colon := self.next_tok(), ast.Colon):
-                raise ParseError(...)
-            if (node := self.parse_node(None)) is None:
-                raise ParseError(...)
-            return ast.BlockMappingElement(name, colon, node)
+            _ = self.next()
+            if not isinstance(colon := self.next(), ast.Colon):
+                raise ParseError(
+                    self.position,
+                    f"Expected a ':' after key in block mapping element, got {colon!r}",
+                )
+            if (value := self.parse_node(None)) is None:
+                raise ParseError(
+                    self.position,
+                    f"Expected value after ':' in block mapping element, got {self.peek()!r}",
+                )
+            return ast.BlockMappingElement(name, colon, value)
         else:
             return None
 
@@ -201,16 +222,14 @@ class Parser:
             return None
 
     def parse_literal_lines(self, N: Optional[int]) -> Optional[ast.LiteralLines]:
-        if isinstance(line := self.peek_tok(), ast.LiteralLine) and self.check_N(
-            line, N
-        ):
-            _ = self.next_tok()
-            N = self.get_N(line)
+        if isinstance(line := self.peek(), ast.LiteralLine) and check_token_N(line, N):
+            _ = self.next()
+            N = get_token_N(line)
             lines = [line]
             while True:
                 if not isinstance(
-                    line := self.peek_tok(), ast.LiteralLine
-                ) or not self.check_N(line, N):
+                    line := self.peek(), ast.LiteralLine
+                ) or not check_token_N(line, N):
                     break
                 lines.append(line)
             return ast.LiteralLines(lines)
@@ -218,16 +237,14 @@ class Parser:
             return None
 
     def parse_folded_lines(self, N: Optional[int]) -> Optional[ast.FoldedLines]:
-        if isinstance(line := self.peek_tok(), ast.FoldedLine) and self.check_N(
-            line, N
-        ):
-            _ = self.next_tok()
-            N = self.get_N(line)
+        if isinstance(line := self.peek(), ast.FoldedLine) and check_token_N(line, N):
+            _ = self.next()
+            N = get_token_N(line)
             lines = [line]
             while True:
                 if not isinstance(
-                    line := self.peek_tok(), ast.FoldedLine
-                ) or not self.check_N(line, N):
+                    line := self.peek(), ast.FoldedLine
+                ) or not check_token_N(line, N):
                     break
                 lines.append(line)
             return ast.FoldedLines(lines)
@@ -237,16 +254,16 @@ class Parser:
     def parse_escaped_literal_lines(
         self, N: Optional[int]
     ) -> Optional[ast.EscapedLiteralLines]:
-        if isinstance(line := self.peek_tok(), ast.EscapedLiteralLine) and self.check_N(
+        if isinstance(line := self.peek(), ast.EscapedLiteralLine) and check_token_N(
             line, N
         ):
-            _ = self.next_tok()
-            N = self.get_N(line)
+            _ = self.next()
+            N = get_token_N(line)
             lines = [line]
             while True:
                 if not isinstance(
-                    line := self.peek_tok(), ast.EscapedLiteralLine
-                ) or not self.check_N(line, N):
+                    line := self.peek(), ast.EscapedLiteralLine
+                ) or not check_token_N(line, N):
                     break
                 lines.append(line)
             return ast.EscapedLiteralLines(lines)
@@ -256,41 +273,41 @@ class Parser:
     def parse_escaped_folded_lines(
         self, N: Optional[int]
     ) -> Optional[ast.EscapedFoldedLines]:
-        if isinstance(line := self.peek_tok(), ast.EscapedFoldedLine) and self.check_N(
+        if isinstance(line := self.peek(), ast.EscapedFoldedLine) and check_token_N(
             line, N
         ):
-            _ = self.next_tok()
-            N = self.get_N(line)
+            _ = self.next()
+            N = get_token_N(line)
             lines = [line]
             while True:
                 if not isinstance(
-                    line := self.peek_tok(), ast.EscapedFoldedLine
-                ) or not self.check_N(line, N):
+                    line := self.peek(), ast.EscapedFoldedLine
+                ) or not check_token_N(line, N):
                     break
                 lines.append(line)
             return ast.EscapedFoldedLines(lines)
         else:
             return None
 
-    def peek_tok(self) -> Optional[ast.Token]:
+    def peek(self) -> Optional[ast.Token]:
         if self.lookahead is None:
             self.lookahead = next(self.lexer, None)
         return self.lookahead
 
-    def next_tok(self) -> Optional[ast.Token]:
+    def next(self) -> Optional[ast.Token]:
         if self.lookahead is not None:
-            self.lookahead, res = None, self.lookahead
-            return res
+            self.lookahead, self.curr = None, self.lookahead
         else:
-            return next(self.lexer, None)
+            self.curr = next(self.lexer, None)
+        return self.curr
 
-    @staticmethod
-    def get_N(token: ast.Token) -> int:
-        return token.position.charno
 
-    @staticmethod
-    def check_N(token: ast.Token, N: Optional[int]) -> bool:
-        return N is not None and Parser.get_N(token) == N
+def get_token_N(token: ast.Token) -> int:
+    return token.position.charno
+
+
+def check_token_N(token: ast.Token, N: Optional[int]) -> bool:
+    return N is not None and get_token_N(token) == N
 
 
 class Lexer(Iterator[ast.Token]):
@@ -301,6 +318,10 @@ class Lexer(Iterator[ast.Token]):
         self.curr = ""
         self.lookahead: Optional[str] = None
         self.capture: List[str] = []
+
+    @property
+    def position(self) -> ast.Position:
+        return ast.Position(self.lineno, self.charno)
 
     def __next__(self) -> ast.Token:  # noqa: C901
         if self.charno == -1:
@@ -323,25 +344,24 @@ class Lexer(Iterator[ast.Token]):
             self.start_capture()
 
             # null, true, false, inf, nan, names
-            if self.is_letter(c):
+            if is_letter(c):
                 return self.lex_name()
 
             # numbers, +inf, -inf, dash
             elif c == "-":
                 p = self.peek()
-                if self.is_letter(p):
+                if is_letter(p):
                     return self.lex_number_special()
-                elif self.is_digit(p):
-                    return self.lex_decimal()
-                else:
+                elif p in " \n#":
                     return self.lex_punc(ast.Dash)
+                else:
+                    return self.lex_decimal()
             elif c == "+":
                 p = self.peek()
-                if self.is_letter(p):
+                if is_letter(p):
                     return self.lex_number_special()
-                elif self.is_digit(p):
+                else:
                     return self.lex_decimal()
-                # fallthough to ParseError
             elif c == "0":
                 p = self.peek()
                 if p in "Xx":
@@ -352,7 +372,7 @@ class Lexer(Iterator[ast.Token]):
                     return self.lex_binary()
                 else:
                     return self.lex_decimal()
-            elif c in "123456789":
+            elif is_digit(c):
                 return self.lex_decimal()
 
             # strings
@@ -387,16 +407,25 @@ class Lexer(Iterator[ast.Token]):
             elif c == "":
                 raise StopIteration
 
-            raise ParseError(...)
+            # errors
+            elif is_control_code(c):
+                raise ParseError(
+                    self.position,
+                    f"Control codes are not valid source characters, got {self.curr!r}",
+                )
+
+            raise ParseError(self.position, f"Unexpected character: {self.curr!r}")
 
     def lex_hex(self) -> ast.Integer:
         assert self.curr == "0"
         c = self.next()
         assert c in "Xx"
         c = self.next()
-        if not self.is_hex(c):
-            raise ParseError(...)
-        while self.is_hex(c):
+        if not is_hex(c):
+            raise ParseError(
+                self.position, "At least one digit required in hexadecimal literal"
+            )
+        while is_hex(c):
             c = self.save_and_next()
         value = int(self.get_capture(), 16)
         return ast.Integer(self.finish_capture(), value)
@@ -407,7 +436,9 @@ class Lexer(Iterator[ast.Token]):
         assert c in "Oo"
         c = self.next()
         if c not in "01234567":
-            raise ParseError(...)
+            raise ParseError(
+                self.position, "At least one digit required in octal literal"
+            )
         while c in "01234567":
             c = self.save_and_next()
         value = int(self.get_capture(), 8)
@@ -419,7 +450,9 @@ class Lexer(Iterator[ast.Token]):
         assert c in "Bb"
         c = self.next()
         if c not in "01":
-            raise ParseError(...)
+            raise ParseError(
+                self.position, "At least one digit required in binary literal"
+            )
         while c in "01":
             c = self.save_and_next()
         value = int(self.get_capture(), 2)
@@ -450,15 +483,18 @@ class Lexer(Iterator[ast.Token]):
 
     def consume_integral(self) -> None:
         c = self.curr
-        if not self.is_digit(c):
-            raise ParseError(...)
-        while self.is_digit(c):
+        if not is_digit(c):
+            raise ParseError(
+                self.position,
+                "At least one digit required in integral part of decimal literal",
+            )
+        while is_digit(c):
             c = self.save_and_next()
 
     def consume_fractional(self) -> None:
         assert self.curr == "."
         c = self.save_and_next()
-        while self.is_digit(c):
+        while is_digit(c):
             c = self.save_and_next()
 
     def consume_exponent(self) -> None:
@@ -466,22 +502,27 @@ class Lexer(Iterator[ast.Token]):
         c = self.save_and_next()
         if c in "+-":
             c = self.save_and_next()
-        if not self.is_digit(c):
-            raise ParseError(...)
-        while self.is_digit(c):
+        if not is_digit(c):
+            raise ParseError(
+                self.position,
+                "At least one digit required in exponent part of decimal literal",
+            )
+        while is_digit(c):
             c = self.save_and_next()
 
     def lex_number_special(self) -> ast.Float:
         c = self.curr
-        while self.is_letter(c):
+        while is_letter(c):
             c = self.save_and_next()
         value = self.get_capture()
         if value == "-inf":
-            return ast.Float(self.finish_capture(), value=-inf)
+            return ast.Float(self.finish_capture(), -inf)
         elif value == "+inf":
-            return ast.Float(self.finish_capture(), value=inf)
+            return ast.Float(self.finish_capture(), inf)
         else:
-            raise ParseError(...)
+            raise ParseError(
+                self.finish_capture(), f"{value!r} is not a valid named number"
+            )
 
     def lex_string(self) -> ast.String:
         c = self.next()
@@ -491,12 +532,15 @@ class Lexer(Iterator[ast.Token]):
                 break
             elif c == "\\":
                 self.consume_escape()
-            elif self.is_character(c):
+            elif is_character(c):
                 self.save_and_next()
             elif c in ("\n", ""):
-                raise ParseError(...)
-            elif self.is_control_code(c):
-                raise ParseError(...)
+                raise ParseError(self.position, "Unterminated string literal")
+            elif is_control_code(c):
+                raise ParseError(
+                    self.position,
+                    f"Control codes are not valid string characters, got {c!r}",
+                )
             else:
                 assert False, "unreachable"
         return ast.String(self.finish_capture(), self.get_capture())
@@ -504,12 +548,15 @@ class Lexer(Iterator[ast.Token]):
     def lex_literal_line(self) -> ast.LiteralLine:
         c = self.next()
         while True:
-            if self.is_character(c):
+            if is_character(c):
                 c = self.save_and_next()
             elif c in ("\n", ""):
                 break
-            elif self.is_control_code(c):
-                raise ParseError(...)
+            elif is_control_code(c):
+                raise ParseError(
+                    self.position,
+                    f"Control codes are not valid line characters, got {c!r}",
+                )
             else:
                 assert False, "unreachable"
         return ast.LiteralLine(self.finish_capture(), self.get_capture())
@@ -517,12 +564,15 @@ class Lexer(Iterator[ast.Token]):
     def lex_folded_line(self) -> ast.FoldedLine:
         c = self.next()
         while True:
-            if self.is_character(c):
+            if is_character(c):
                 c = self.save_and_next()
             elif c in ("\n", ""):
                 break
-            elif self.is_control_code(c):
-                raise ParseError(...)
+            elif is_control_code(c):
+                raise ParseError(
+                    self.position,
+                    f"Control codes are not valid line characters, got {c!r}",
+                )
             else:
                 assert False, "unreachable"
         value = self.get_capture().strip()
@@ -537,12 +587,15 @@ class Lexer(Iterator[ast.Token]):
         while True:
             if c == "\\":
                 self.consume_escape()
-            elif self.is_character(c):
+            elif is_character(c):
                 c = self.save_and_next()
             elif c in ("\n", ""):
                 break
-            elif self.is_control_code(c):
-                raise ParseError(...)
+            elif is_control_code(c):
+                raise ParseError(
+                    self.position,
+                    f"Control codes are not valid line characters, got {c!r}",
+                )
             else:
                 assert False, "unreachable"
         return ast.EscapedLiteralLine(self.finish_capture(), self.get_capture())
@@ -552,12 +605,15 @@ class Lexer(Iterator[ast.Token]):
         while True:
             if c == "\\":
                 self.consume_escape()
-            elif self.is_character(c):
+            elif is_character(c):
                 c = self.save_and_next()
             elif c in ("\n", ""):
                 break
-            elif self.is_control_code(c):
-                raise ParseError(...)
+            elif is_control_code(c):
+                raise ParseError(
+                    self.position,
+                    f"Control codes are not valid line characters, got {c!r}",
+                )
             else:
                 assert False, "unreachable"
         value = self.get_capture().strip()
@@ -569,21 +625,21 @@ class Lexer(Iterator[ast.Token]):
 
     def lex_name(self) -> Union[ast.Null, ast.Boolean, ast.Float, ast.Name]:
         c = self.save_and_next()
-        while self.is_letter(c) or c in "0123456789":
+        while is_letter(c) or c in "0123456789":
             c = self.save_and_next()
         value = self.get_capture()
         if value == "null":
-            return ast.Null(self.finish_capture(), value=None)
+            return ast.Null(self.finish_capture(), None)
         elif value == "true":
-            return ast.Boolean(self.finish_capture(), value=True)
+            return ast.Boolean(self.finish_capture(), True)
         elif value == "false":
-            return ast.Boolean(self.finish_capture(), value=False)
+            return ast.Boolean(self.finish_capture(), False)
         elif value == "inf":
-            return ast.Float(self.finish_capture(), value=inf)
+            return ast.Float(self.finish_capture(), inf)
         elif value == "nan":
-            return ast.Float(self.finish_capture(), value=nan)
+            return ast.Float(self.finish_capture(), nan)
         else:
-            return ast.Name(self.finish_capture(), value=value)
+            return ast.Name(self.finish_capture(), value)
 
     def lex_punc(self, tok_type: Type[TokenT]) -> TokenT:
         self.next()
@@ -619,16 +675,19 @@ class Lexer(Iterator[ast.Token]):
         elif c == "U":
             self.consume_hex(8)
         else:
-            raise ParseError(...)
+            raise ParseError(self.position, f"Invalid escape code: '\\{c}'")
 
     def consume_hex(self, n: int) -> None:
         local_capture: List[str] = []
         for _ in range(n):
             c = self.next()
-            if self.is_hex(c):
+            if is_hex(c):
                 local_capture.append(c)
             else:
-                raise ParseError(...)
+                raise ParseError(
+                    self.position,
+                    f"Expecting hex character as part of escape sequence, got {c!r}",
+                )
         self.save(chr(int("".join(local_capture), 16)))
 
     def next(self) -> str:
@@ -666,22 +725,22 @@ class Lexer(Iterator[ast.Token]):
     def get_capture(self) -> str:
         return "".join(self.capture)
 
-    @staticmethod
-    def is_digit(c: str) -> bool:
-        return c in "0123456789"
 
-    @staticmethod
-    def is_hex(c: str) -> bool:
-        return c in "0123456789abcdefABCDEF"
+def is_digit(c: str) -> bool:
+    return c in "0123456789"
 
-    @staticmethod
-    def is_letter(c: str) -> bool:
-        return c in "_" or "a" <= c <= "z" or "A" <= c <= "Z" or c >= "\xA0"
 
-    @staticmethod
-    def is_character(c: str) -> bool:
-        return "\x20" <= c < "\x7F" or c >= "\xA0"
+def is_hex(c: str) -> bool:
+    return c in "0123456789abcdefABCDEF"
 
-    @staticmethod
-    def is_control_code(c: str) -> bool:
-        return "\x00" <= c < "\x20" or "\x7F" <= c < "\xA0"
+
+def is_letter(c: str) -> bool:
+    return c in "_" or "a" <= c <= "z" or "A" <= c <= "Z" or c >= "\xA0"
+
+
+def is_character(c: str) -> bool:
+    return "\x20" <= c < "\x7F" or c >= "\xA0"
+
+
+def is_control_code(c: str) -> bool:
+    return "\x00" <= c < "\x20" or "\x7F" <= c < "\xA0"
