@@ -72,12 +72,68 @@ def test_float() -> None:
     assert (
         isinstance(tok := single_token("0.789123"), ast.Float) and tok.value == 0.789123
     )
-    assert isinstance(tok := single_token("0e0"), ast.Float) and tok.value == 0.0
+    assert isinstance(tok := single_token("+0e0"), ast.Float) and tok.value == 0.0
     assert isinstance(tok := single_token("0e-1"), ast.Float) and tok.value == 0.0
     assert isinstance(tok := single_token("0.e0"), ast.Float) and tok.value == 0.0
     assert (
-        isinstance(tok := single_token("0123.123e+123"), ast.Float)
-        and tok.value == 0123.123e123
+        isinstance(tok := single_token("-0123.123e+123"), ast.Float)
+        and tok.value == -0123.123e123
     )
     with pytest.raises(ParseError):
         single_token("0eb")
+
+
+def test_string() -> None:
+    assert isinstance(tok := single_token('"abc"'), ast.String) and tok.value == "abc"
+    assert (
+        isinstance(tok := single_token('"\\\\\\"\\/\\b\\f\\n\\r\\t"'), ast.String)
+        and tok.value == '\\"/\b\f\n\r\t'
+    )
+    assert (
+        isinstance(tok := single_token('"\\x7F\\u0Fa9\\U0001F6a6"'), ast.String)
+        and tok.value == "\x7F\u0Fa9\U0001F6a6"
+    )
+    with pytest.raises(ParseError):
+        single_token('"whoops')
+    with pytest.raises(ParseError):
+        single_token('"whoops\n"')
+    with pytest.raises(ParseError):
+        single_token('"whoops\t"')
+    with pytest.raises(ParseError):
+        single_token('"\\j"')
+    with pytest.raises(ParseError):
+        single_token('"\\xM0')
+
+
+def test_lines() -> None:
+    assert (
+        isinstance(tok := single_token("|wow \\x76\n"), ast.LiteralLine)
+        and tok.value == "wow \\x76\n"
+    )
+    assert (
+        isinstance(tok := single_token(">   wow \\x76    \n"), ast.FoldedLine)
+        and tok.value == "wow \\x76 "
+    )
+    assert (
+        isinstance(tok := single_token(">   \n"), ast.FoldedLine) and tok.value == "\n"
+    )
+    assert (
+        isinstance(tok := single_token("\\|wow \\x76"), ast.EscapedLiteralLine)
+        and tok.value == "wow \x76\n"
+    )
+    assert (
+        isinstance(tok := single_token("\\>   wow \\x76    \n"), ast.EscapedFoldedLine)
+        and tok.value == "wow \x76 "
+    )
+    assert (
+        isinstance(tok := single_token("\\>   \n"), ast.EscapedFoldedLine)
+        and tok.value == "\n"
+    )
+    with pytest.raises(ParseError):
+        single_token("|\t\n")
+    with pytest.raises(ParseError):
+        single_token(">\t\n")
+    with pytest.raises(ParseError):
+        single_token("\\|\t\n")
+    with pytest.raises(ParseError):
+        single_token("\\>\t\n")

@@ -1,5 +1,5 @@
 from math import inf, nan
-from typing import Iterator, List, Optional, TextIO, Type, TypeVar, Union
+from typing import Dict, Iterator, List, Optional, TextIO, Type, TypeVar, Union
 
 import scdil._ast as ast
 
@@ -527,16 +527,17 @@ class Lexer(Iterator[ast.Token]):
             )
 
     def lex_string(self) -> ast.String:
+        assert self.curr == '"'
         c = self.next()
         while True:
             if c == '"':
                 self.next()
                 break
             elif c == "\\":
-                self.consume_escape()
+                c = self.consume_escape()
             elif is_character(c):
-                self.save_and_next()
-            elif c in ("\n", ""):
+                c = self.save_and_next()
+            elif c in ("\n", None):
                 raise ParseError(self.position, "Unterminated string literal")
             elif is_control_code(c):
                 raise ParseError(
@@ -544,10 +545,11 @@ class Lexer(Iterator[ast.Token]):
                     f"Control codes are not valid string characters, got {c!r}",
                 )
             else:
-                assert False, "unreachable"
+                assert False, "unreachable"  # pragma: no cover
         return ast.String(self.finish_capture(), self.get_capture())
 
     def lex_literal_line(self) -> ast.LiteralLine:
+        assert self.curr == "|"
         c = self.next()
         while True:
             if is_character(c):
@@ -560,10 +562,12 @@ class Lexer(Iterator[ast.Token]):
                     f"Control codes are not valid line characters, got {c!r}",
                 )
             else:
-                assert False, "unreachable"
+                assert False, "unreachable"  # pragma: no cover
+        self.save("\n")
         return ast.LiteralLine(self.finish_capture(), self.get_capture())
 
     def lex_folded_line(self) -> ast.FoldedLine:
+        assert self.curr == ">"
         c = self.next()
         while True:
             if is_character(c):
@@ -576,7 +580,7 @@ class Lexer(Iterator[ast.Token]):
                     f"Control codes are not valid line characters, got {c!r}",
                 )
             else:
-                assert False, "unreachable"
+                assert False, "unreachable"  # pragma: no cover
         value = self.get_capture().strip()
         if value == "":
             value = "\n"
@@ -585,10 +589,12 @@ class Lexer(Iterator[ast.Token]):
         return ast.FoldedLine(self.finish_capture(), value)
 
     def lex_escaped_literal_line(self) -> ast.EscapedLiteralLine:
+        assert self.curr == "\\"
+        assert self.next() == "|"
         c = self.next()
         while True:
             if c == "\\":
-                self.consume_escape()
+                c = self.consume_escape()
             elif is_character(c):
                 c = self.save_and_next()
             elif c in ("\n", None):
@@ -599,14 +605,17 @@ class Lexer(Iterator[ast.Token]):
                     f"Control codes are not valid line characters, got {c!r}",
                 )
             else:
-                assert False, "unreachable"
+                assert False, "unreachable"  # pragma: no cover
+        self.save("\n")
         return ast.EscapedLiteralLine(self.finish_capture(), self.get_capture())
 
     def lex_escaped_folded_line(self) -> ast.EscapedFoldedLine:
+        assert self.curr == "\\"
+        assert self.next() == ">"
         c = self.next()
         while True:
             if c == "\\":
-                self.consume_escape()
+                c = self.consume_escape()
             elif is_character(c):
                 c = self.save_and_next()
             elif c in ("\n", None):
@@ -617,7 +626,7 @@ class Lexer(Iterator[ast.Token]):
                     f"Control codes are not valid line characters, got {c!r}",
                 )
             else:
-                assert False, "unreachable"
+                assert False, "unreachable"  # pragma: no cover
         value = self.get_capture().strip()
         if value == "":
             value = "\n"
@@ -647,39 +656,43 @@ class Lexer(Iterator[ast.Token]):
         self.next()
         return tok_type(self.finish_capture())
 
-    def consume_escape(self) -> None:  # noqa: C901
+    def consume_escape(self) -> Optional[str]:  # noqa: C901
+        assert self.curr == "\\"
         c = self.next()
         if c == "\\":
-            self.next()
             self.save("\\")
+            return self.next()
         elif c == '"':
-            self.next()
             self.save('"')
+            return self.next()
         elif c == "/":
-            self.next()
             self.save("/")
+            return self.next()
         elif c == "b":
-            self.next()
             self.save("\b")
+            return self.next()
+        elif c == "f":
+            self.save("\f")
+            return self.next()
         elif c == "n":
-            self.next()
             self.save("\n")
+            return self.next()
         elif c == "r":
-            self.next()
             self.save("\r")
+            return self.next()
         elif c == "t":
-            self.next()
             self.save("\t")
+            return self.next()
         elif c == "x":
-            self.consume_hex(2)
+            return self.consume_hex(2)
         elif c == "u":
-            self.consume_hex(4)
+            return self.consume_hex(4)
         elif c == "U":
-            self.consume_hex(8)
+            return self.consume_hex(8)
         else:
             raise ParseError(self.position, f"Invalid escape code: '\\{c}'")
 
-    def consume_hex(self, n: int) -> None:
+    def consume_hex(self, n: int) -> Optional[str]:
         local_capture: List[str] = []
         for _ in range(n):
             c = self.next()
@@ -691,6 +704,7 @@ class Lexer(Iterator[ast.Token]):
                     f"Expecting hex character as part of escape sequence, got {c!r}",
                 )
         self.save(chr(int("".join(local_capture), 16)))
+        return self.next()
 
     def _next(self) -> Optional[str]:
         c = self.stream.read(1)
@@ -740,6 +754,16 @@ class Lexer(Iterator[ast.Token]):
         return "".join(self.capture)
 
 
+escape_codes: Dict[Optional[str], str] = {
+    "\\": "\\",
+    '"': '"',
+    "/": "/",
+    "b": "\b",
+    "f": "\f",
+    "n": "\n",
+    "r": "\r",
+    "t": "\t",
+}
 octal_chars = frozenset("01234567")
 digit_chars = frozenset("0123456789")
 hex_chars = frozenset("0123456789abcdefABCDEF")
