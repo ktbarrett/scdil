@@ -327,95 +327,96 @@ class Lexer(Iterator[ast.Token]):
         if self.charno == -1:
             self.next()
 
+        c = self.curr
         while True:
-            c = self.curr
-
-            # end of stream
-            if c is None:
-                raise StopIteration
 
             # chomp whitespace
-            elif c in (" ", "\n"):
+            while c in (" ", "\n"):
                 c = self.next()
-                continue
 
             # chomp comments
-            elif c == "#":
-                while c != "\n":
+            if c == "#":
+                while c not in ("\n", None):
                     c = self.next()
-                continue
+
+            # end of stream
+            elif c is None:
+                raise StopIteration
 
             # found something interesting
-            self.start_capture()
+            else:
+                break  # pragma: no cover
 
-            # null, true, false, inf, nan, names
-            if is_letter(c):
-                return self.lex_name()
+        self.start_capture()
 
-            # numbers, +inf, -inf, dash
-            elif c == "-":
-                p = self.peek()
-                if is_letter(p):
-                    return self.lex_number_special()
-                elif p in (" ", "\n", "#", None):
-                    return self.lex_punc(ast.Dash)
-                else:
-                    return self.lex_decimal()
-            elif c == "+":
-                p = self.peek()
-                if is_letter(p):
-                    return self.lex_number_special()
-                else:
-                    return self.lex_decimal()
-            elif c == "0":
-                p = self.peek()
-                if p in ("X", "x"):
-                    return self.lex_hex()
-                elif p in ("O", "o"):
-                    return self.lex_octal()
-                elif p in ("B", "b"):
-                    return self.lex_binary()
-                else:
-                    return self.lex_decimal()
-            elif c in digit_chars:
+        # null, true, false, inf, nan, names
+        if is_letter(c):
+            return self.lex_name()
+
+        # numbers, +inf, -inf, dash
+        elif c == "-":
+            p = self.peek()
+            if is_letter(p):
+                return self.lex_number_special()
+            elif p in (" ", "\n", "#", None):
+                return self.lex_punc(ast.Dash)
+            else:
                 return self.lex_decimal()
+        elif c == "+":
+            p = self.peek()
+            if is_letter(p):
+                return self.lex_number_special()
+            else:
+                return self.lex_decimal()
+        elif c == "0":
+            p = self.peek()
+            if p in ("X", "x"):
+                return self.lex_hex()
+            elif p in ("O", "o"):
+                return self.lex_octal()
+            elif p in ("B", "b"):
+                return self.lex_binary()
+            else:
+                return self.lex_decimal()
+        elif c in digit_chars:
+            return self.lex_decimal()
 
-            # strings
-            elif c == '"':
-                return self.lex_string()
+        # strings
+        elif c == '"':
+            return self.lex_string()
 
-            # lines
-            elif c == "|":
-                return self.lex_literal_line()
-            elif c == ">":
-                return self.lex_folded_line()
-            elif c == "\\" and self.peek() == "|":
-                return self.lex_escaped_literal_line()
-            elif c == "\\" and self.peek() == ">":
-                return self.lex_escaped_folded_line()
+        # lines
+        elif c == "|":
+            return self.lex_literal_line()
+        elif c == ">":
+            return self.lex_folded_line()
+        elif c == "\\" and self.peek() == "|":
+            return self.lex_escaped_literal_line()
+        elif c == "\\" and self.peek() == ">":
+            return self.lex_escaped_folded_line()
 
-            # puncatuation
-            elif c == "[":
-                return self.lex_punc(ast.LBracket)
-            elif c == "]":
-                return self.lex_punc(ast.RBracket)
-            elif c == "{":
-                return self.lex_punc(ast.LCurly)
-            elif c == "}":
-                return self.lex_punc(ast.RCurly)
-            elif c == ",":
-                return self.lex_punc(ast.Comma)
-            elif c == ":":
-                return self.lex_punc(ast.Colon)
+        # puncatuation
+        elif c == "[":
+            return self.lex_punc(ast.LBracket)
+        elif c == "]":
+            return self.lex_punc(ast.RBracket)
+        elif c == "{":
+            return self.lex_punc(ast.LCurly)
+        elif c == "}":
+            return self.lex_punc(ast.RCurly)
+        elif c == ",":
+            return self.lex_punc(ast.Comma)
+        elif c == ":":
+            return self.lex_punc(ast.Colon)
 
-            # errors
-            elif is_control_code(c):
-                raise ParseError(
-                    self.position,
-                    f"Control codes are not valid source characters, got {self.curr!r}",
-                )
+        # errors
+        elif is_control_code(c):
+            raise ParseError(
+                self.position,
+                f"Control codes are not valid source characters, got {self.curr!r}",
+            )
 
-            raise ParseError(self.position, f"Unexpected character: {self.curr!r}")
+        raise ParseError(self.position, f"Unexpected character: {self.curr!r}")
 
     def lex_hex(self) -> ast.Integer:
         assert self.curr == "0"

@@ -137,3 +137,21 @@ def test_lines() -> None:
         single_token("\\|\t\n")
     with pytest.raises(ParseError):
         single_token("\\>\t\n")
+
+
+def test_punc() -> None:
+    assert isinstance(single_token("["), ast.LBracket)
+    assert isinstance(single_token("]"), ast.RBracket)
+    assert isinstance(single_token("{"), ast.LCurly)
+    assert isinstance(single_token("}"), ast.RCurly)
+    assert isinstance(single_token(":"), ast.Colon)
+    assert isinstance(single_token(","), ast.Comma)
+    assert isinstance(single_token("- "), ast.Dash)
+
+
+def test_lexer_misc() -> None:
+    assert isinstance(single_token(" \n   # skip this\n123 #value is 123"), ast.Integer)
+    with pytest.raises(ParseError):
+        single_token("\tinvalid")
+    with pytest.raises(ParseError):
+        single_token("$invalid")
