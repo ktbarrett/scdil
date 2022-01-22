@@ -29,8 +29,8 @@ def dump(
     for_humans: bool = True,
     indent: str = " ",
 ) -> None:
-    raise TypeError(f"Got instance of unsupported type {type(value).__qualname__!r}")
     """Writes a Python value in SCDIL format to the stream"""
+    raise TypeError(f"Got instance of unsupported type {type(value).__qualname__!r}")
 
 
 @dump.register

@@ -315,7 +315,7 @@ class Lexer(Iterator[ast.Token]):
         self.stream = stream
         self.lineno = 0
         self.charno = -1
-        self.curr = ""
+        self.curr: Optional[str] = None
         self.lookahead: Optional[str] = None
         self.capture: List[str] = []
 
@@ -330,12 +330,17 @@ class Lexer(Iterator[ast.Token]):
         while True:
             c = self.curr
 
+            # end of stream
+            if c is None:
+                raise StopIteration
+
             # chomp whitespace
-            while c in " \n":
+            elif c in (" ", "\n"):
                 c = self.next()
+                continue
 
             # chomp comments
-            if c == "#":
+            elif c == "#":
                 while c != "\n":
                     c = self.next()
                 continue
@@ -352,7 +357,7 @@ class Lexer(Iterator[ast.Token]):
                 p = self.peek()
                 if is_letter(p):
                     return self.lex_number_special()
-                elif p in " \n#":
+                elif p in (" ", "\n", "#", None):
                     return self.lex_punc(ast.Dash)
                 else:
                     return self.lex_decimal()
@@ -364,15 +369,15 @@ class Lexer(Iterator[ast.Token]):
                     return self.lex_decimal()
             elif c == "0":
                 p = self.peek()
-                if p in "Xx":
+                if p in ("X", "x"):
                     return self.lex_hex()
-                elif p in "Oo":
+                elif p in ("O", "o"):
                     return self.lex_octal()
-                elif p in "Bb":
+                elif p in ("B", "b"):
                     return self.lex_binary()
                 else:
                     return self.lex_decimal()
-            elif is_digit(c):
+            elif c in digit_chars:
                 return self.lex_decimal()
 
             # strings
@@ -403,10 +408,6 @@ class Lexer(Iterator[ast.Token]):
             elif c == ":":
                 return self.lex_punc(ast.Colon)
 
-            # end of stream
-            elif c == "":
-                raise StopIteration
-
             # errors
             elif is_control_code(c):
                 raise ParseError(
@@ -419,13 +420,13 @@ class Lexer(Iterator[ast.Token]):
     def lex_hex(self) -> ast.Integer:
         assert self.curr == "0"
         c = self.next()
-        assert c in "Xx"
+        assert c in ("X", "x")
         c = self.next()
-        if not is_hex(c):
+        if c not in hex_chars:
             raise ParseError(
                 self.position, "At least one digit required in hexadecimal literal"
             )
-        while is_hex(c):
+        while c in hex_chars:
             c = self.save_and_next()
         value = int(self.get_capture(), 16)
         return ast.Integer(self.finish_capture(), value)
@@ -433,13 +434,13 @@ class Lexer(Iterator[ast.Token]):
     def lex_octal(self) -> ast.Integer:
         assert self.curr == "0"
         c = self.next()
-        assert c in "Oo"
+        assert c in ("O", "o")
         c = self.next()
-        if c not in "01234567":
+        if c not in octal_chars:
             raise ParseError(
                 self.position, "At least one digit required in octal literal"
             )
-        while c in "01234567":
+        while c in octal_chars:
             c = self.save_and_next()
         value = int(self.get_capture(), 8)
         return ast.Integer(self.finish_capture(), value)
@@ -447,13 +448,13 @@ class Lexer(Iterator[ast.Token]):
     def lex_binary(self) -> ast.Integer:
         assert self.curr == "0"
         c = self.next()
-        assert c in "Bb"
+        assert c in ("B", "b")
         c = self.next()
-        if c not in "01":
+        if c not in ("0", "1"):
             raise ParseError(
                 self.position, "At least one digit required in binary literal"
             )
-        while c in "01":
+        while c in ("0", "1"):
             c = self.save_and_next()
         value = int(self.get_capture(), 2)
         return ast.Integer(self.finish_capture(), value)
@@ -461,7 +462,7 @@ class Lexer(Iterator[ast.Token]):
     def lex_decimal(self) -> Union[ast.Integer, ast.Float]:
         is_float = False
         # optional +/-
-        if self.curr in "+-":
+        if self.curr in ("+", "-"):
             self.save_and_next()
         # integer portion
         self.consume_integral()
@@ -470,7 +471,7 @@ class Lexer(Iterator[ast.Token]):
             is_float = True
             self.consume_fractional()
         # optional exponential
-        if self.curr in "Ee":
+        if self.curr in ("E", "e"):
             is_float = True
             self.consume_exponent()
         # evaluate
@@ -483,35 +484,36 @@ class Lexer(Iterator[ast.Token]):
 
     def consume_integral(self) -> None:
         c = self.curr
-        if not is_digit(c):
+        if c not in digit_chars:
             raise ParseError(
                 self.position,
                 "At least one digit required in integral part of decimal literal",
             )
-        while is_digit(c):
+        while c in digit_chars:
             c = self.save_and_next()
 
     def consume_fractional(self) -> None:
         assert self.curr == "."
         c = self.save_and_next()
-        while is_digit(c):
+        while c in digit_chars:
             c = self.save_and_next()
 
     def consume_exponent(self) -> None:
-        assert self.curr in "Ee"
+        assert self.curr in ("E", "e")
         c = self.save_and_next()
-        if c in "+-":
+        if c in ("+", "-"):
             c = self.save_and_next()
-        if not is_digit(c):
+        if c not in digit_chars:
             raise ParseError(
                 self.position,
                 "At least one digit required in exponent part of decimal literal",
             )
-        while is_digit(c):
+        while c in digit_chars:
             c = self.save_and_next()
 
     def lex_number_special(self) -> ast.Float:
-        c = self.curr
+        assert self.curr in ("+", "-")
+        c = self.save_and_next()
         while is_letter(c):
             c = self.save_and_next()
         value = self.get_capture()
@@ -550,7 +552,7 @@ class Lexer(Iterator[ast.Token]):
         while True:
             if is_character(c):
                 c = self.save_and_next()
-            elif c in ("\n", ""):
+            elif c in ("\n", None):
                 break
             elif is_control_code(c):
                 raise ParseError(
@@ -566,7 +568,7 @@ class Lexer(Iterator[ast.Token]):
         while True:
             if is_character(c):
                 c = self.save_and_next()
-            elif c in ("\n", ""):
+            elif c in ("\n", None):
                 break
             elif is_control_code(c):
                 raise ParseError(
@@ -589,7 +591,7 @@ class Lexer(Iterator[ast.Token]):
                 self.consume_escape()
             elif is_character(c):
                 c = self.save_and_next()
-            elif c in ("\n", ""):
+            elif c in ("\n", None):
                 break
             elif is_control_code(c):
                 raise ParseError(
@@ -607,7 +609,7 @@ class Lexer(Iterator[ast.Token]):
                 self.consume_escape()
             elif is_character(c):
                 c = self.save_and_next()
-            elif c in ("\n", ""):
+            elif c in ("\n", None):
                 break
             elif is_control_code(c):
                 raise ParseError(
@@ -625,7 +627,7 @@ class Lexer(Iterator[ast.Token]):
 
     def lex_name(self) -> Union[ast.Null, ast.Boolean, ast.Float, ast.Name]:
         c = self.save_and_next()
-        while is_letter(c) or c in "0123456789":
+        while is_letter(c) or c in digit_chars:
             c = self.save_and_next()
         value = self.get_capture()
         if value == "null":
@@ -647,25 +649,25 @@ class Lexer(Iterator[ast.Token]):
 
     def consume_escape(self) -> None:  # noqa: C901
         c = self.next()
-        if c in "\\":
+        if c == "\\":
             self.next()
             self.save("\\")
-        elif c in '"':
+        elif c == '"':
             self.next()
             self.save('"')
-        elif c in "/":
+        elif c == "/":
             self.next()
             self.save("/")
-        elif c in "b":
+        elif c == "b":
             self.next()
             self.save("\b")
-        elif c in "n":
+        elif c == "n":
             self.next()
             self.save("\n")
-        elif c in "r":
+        elif c == "r":
             self.next()
             self.save("\r")
-        elif c in "t":
+        elif c == "t":
             self.next()
             self.save("\t")
         elif c == "x":
@@ -681,7 +683,7 @@ class Lexer(Iterator[ast.Token]):
         local_capture: List[str] = []
         for _ in range(n):
             c = self.next()
-            if is_hex(c):
+            if c in hex_chars:
                 local_capture.append(c)
             else:
                 raise ParseError(
@@ -690,27 +692,39 @@ class Lexer(Iterator[ast.Token]):
                 )
         self.save(chr(int("".join(local_capture), 16)))
 
-    def next(self) -> str:
+    def _next(self) -> Optional[str]:
+        c = self.stream.read(1)
+        if c == "":
+            return None
+        else:
+            return c
+
+    def next(self) -> Optional[str]:
         if self.curr == "\n":
             self.lineno += 1
             self.charno = 0
         else:
             self.charno += 1
         if self.lookahead is None:
-            self.curr = self.stream.read(1)
+            self.curr = self._next()
         else:
             self.curr, self.lookahead = self.lookahead, None
         return self.curr
 
-    def peek(self) -> str:
+    def peek(self) -> Optional[str]:
         if self.lookahead is None:
-            self.lookahead = self.stream.read(1)
+            c = self.stream.read(1)
+            if c == "":
+                self.lookahead = None
+            else:
+                self.lookahead = c
         return self.lookahead
 
     def save(self, c: str) -> None:
         self.capture.append(c)
 
-    def save_and_next(self) -> str:
+    def save_and_next(self) -> Optional[str]:
+        assert self.curr is not None
         self.save(self.curr)
         return self.next()
 
@@ -726,21 +740,20 @@ class Lexer(Iterator[ast.Token]):
         return "".join(self.capture)
 
 
-def is_digit(c: str) -> bool:
-    return c in "0123456789"
+octal_chars = frozenset("01234567")
+digit_chars = frozenset("0123456789")
+hex_chars = frozenset("0123456789abcdefABCDEF")
 
 
-def is_hex(c: str) -> bool:
-    return c in "0123456789abcdefABCDEF"
+def is_letter(c: Optional[str]) -> bool:
+    return c is not None and (
+        c in "_" or "a" <= c <= "z" or "A" <= c <= "Z" or c >= "\xA0"
+    )
 
 
-def is_letter(c: str) -> bool:
-    return c in "_" or "a" <= c <= "z" or "A" <= c <= "Z" or c >= "\xA0"
+def is_character(c: Optional[str]) -> bool:
+    return c is not None and ("\x20" <= c < "\x7F" or c >= "\xA0")
 
 
-def is_character(c: str) -> bool:
-    return "\x20" <= c < "\x7F" or c >= "\xA0"
-
-
-def is_control_code(c: str) -> bool:
-    return "\x00" <= c < "\x20" or "\x7F" <= c < "\xA0"
+def is_control_code(c: Optional[str]) -> bool:
+    return c is not None and ("\x00" <= c < "\x20" or "\x7F" <= c < "\xA0")
