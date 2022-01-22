@@ -227,11 +227,13 @@ class Parser:
             N = get_token_N(line)
             lines = [line]
             while True:
-                if not isinstance(
-                    line := self.peek(), ast.LiteralLine
-                ) or not check_token_N(line, N):
+                if not (
+                    isinstance(line := self.peek(), ast.LiteralLine)
+                    and check_token_N(line, N)
+                ):
                     break
                 lines.append(line)
+                self.next()
             return ast.LiteralLines(lines)
         else:
             return None
@@ -247,6 +249,7 @@ class Parser:
                 ) or not check_token_N(line, N):
                     break
                 lines.append(line)
+                self.next()
             return ast.FoldedLines(lines)
         else:
             return None
@@ -266,6 +269,7 @@ class Parser:
                 ) or not check_token_N(line, N):
                     break
                 lines.append(line)
+                self.next()
             return ast.EscapedLiteralLines(lines)
         else:
             return None
@@ -285,6 +289,7 @@ class Parser:
                 ) or not check_token_N(line, N):
                     break
                 lines.append(line)
+                self.next()
             return ast.EscapedFoldedLines(lines)
         else:
             return None
@@ -307,7 +312,10 @@ def get_token_N(token: ast.Token) -> int:
 
 
 def check_token_N(token: ast.Token, N: Optional[int]) -> bool:
-    return N is not None and get_token_N(token) == N
+    if N is None:
+        return True
+    else:
+        return get_token_N(token) == N
 
 
 class Lexer(Iterator[ast.Token]):
@@ -564,7 +572,6 @@ class Lexer(Iterator[ast.Token]):
                 )
             else:
                 assert False, "unreachable"  # pragma: no cover
-        self.save("\n")
         return ast.LiteralLine(self.finish_capture(), self.get_capture())
 
     def lex_folded_line(self) -> ast.FoldedLine:
@@ -582,12 +589,7 @@ class Lexer(Iterator[ast.Token]):
                 )
             else:
                 assert False, "unreachable"  # pragma: no cover
-        value = self.get_capture().strip()
-        if value == "":
-            value = "\n"
-        else:
-            value += " "
-        return ast.FoldedLine(self.finish_capture(), value)
+        return ast.FoldedLine(self.finish_capture(), self.get_capture())
 
     def lex_escaped_literal_line(self) -> ast.EscapedLiteralLine:
         assert self.curr == "\\"
@@ -607,7 +609,6 @@ class Lexer(Iterator[ast.Token]):
                 )
             else:
                 assert False, "unreachable"  # pragma: no cover
-        self.save("\n")
         return ast.EscapedLiteralLine(self.finish_capture(), self.get_capture())
 
     def lex_escaped_folded_line(self) -> ast.EscapedFoldedLine:
@@ -628,12 +629,7 @@ class Lexer(Iterator[ast.Token]):
                 )
             else:
                 assert False, "unreachable"  # pragma: no cover
-        value = self.get_capture().strip()
-        if value == "":
-            value = "\n"
-        else:
-            value += " "
-        return ast.EscapedFoldedLine(self.finish_capture(), value)
+        return ast.EscapedFoldedLine(self.finish_capture(), self.get_capture())
 
     def lex_name(self) -> Union[ast.Null, ast.Boolean, ast.Float, ast.Name]:
         c = self.save_and_next()
