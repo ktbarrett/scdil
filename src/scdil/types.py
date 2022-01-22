@@ -1,3 +1,4 @@
+from abc import abstractmethod
 from typing import (
     ItemsView,
     Iterator,
@@ -32,21 +33,27 @@ SCDILValue = Union[None, bool, int, float, str, "SCDILSequence", "SCDILMapping"]
 class SCDILSequence(Protocol):
     """ """
 
+    @abstractmethod
     def __len__(self) -> int:
         ...
 
+    @abstractmethod
     def __contains__(self, item: object) -> bool:
         ...
 
+    @abstractmethod
     def __getitem__(self, item: int) -> SCDILValue:
         ...
 
+    @abstractmethod
     def __iter__(self) -> Iterator[SCDILValue]:
         ...
 
+    @abstractmethod
     def index(self, item: object, start: int = ..., stop: int = ...) -> int:
         ...
 
+    @abstractmethod
     def count(self, item: object) -> int:
         ...
 
@@ -55,15 +62,19 @@ class SCDILSequence(Protocol):
 class SCDILMapping(Protocol):
     """ """
 
+    @abstractmethod
     def __len__(self) -> int:
         ...
 
+    @abstractmethod
     def __contains__(self, item: object) -> bool:
         ...
 
+    @abstractmethod
     def __getitem__(self, item: SCDILValue) -> SCDILValue:
         ...
 
+    @abstractmethod
     def __iter__(self) -> Iterator[SCDILValue]:
         ...
 
@@ -75,11 +86,14 @@ class SCDILMapping(Protocol):
     def get(self, item: object, default: T) -> Union[SCDILValue, T]:
         ...
 
+    @abstractmethod
     def keys(self) -> KeysView[SCDILValue]:
         ...
 
+    @abstractmethod
     def values(self) -> ValuesView[SCDILValue]:
         ...
 
+    @abstractmethod
     def items(self) -> ItemsView[SCDILValue, SCDILValue]:
         ...
