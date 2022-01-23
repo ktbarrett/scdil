@@ -175,23 +175,19 @@ def parse(source: str) -> Optional[ast.Node]:
 
 
 def test_parse_scalars() -> None:
-    assert parse("-0.123") == ast.Scalar(ast.Float(any_pos, -0.123))
-    assert parse("true  # wew") == ast.Scalar(ast.Boolean(any_pos, True))
-    assert parse("  null") == ast.Scalar(ast.Null(any_pos, None))
-    assert parse('"123"') == ast.Scalar(ast.String(any_pos, "123"))
-    assert parse("#comment\n  +0 ") == ast.Scalar(ast.Integer(any_pos, 0))
+    assert parse("-0.123") == ast.Float(any_pos, -0.123)
+    assert parse("true  # wew") == ast.Boolean(any_pos, True)
+    assert parse("  null") == ast.Null(any_pos, None)
+    assert parse('"123"') == ast.String(any_pos, "123")
+    assert parse("#comment\n  +0 ") == ast.Integer(any_pos, 0)
 
 
 def test_parse_sequence() -> None:
     assert parse('[123, "123",]') == ast.Sequence(
         ast.LBracket(any_pos),
         [
-            ast.SequenceElement(
-                ast.Scalar(ast.Integer(any_pos, 123)), ast.Comma(any_pos)
-            ),
-            ast.SequenceElement(
-                ast.Scalar(ast.String(any_pos, "123")), ast.Comma(any_pos)
-            ),
+            ast.SequenceElement(ast.Integer(any_pos, 123), ast.Comma(any_pos)),
+            ast.SequenceElement(ast.String(any_pos, "123"), ast.Comma(any_pos)),
         ],
         ast.RBracket(any_pos),
     )
@@ -202,15 +198,15 @@ def test_parse_mapping() -> None:
         ast.LCurly(any_pos),
         [
             ast.MappingElement(
-                ast.Scalar(ast.String(any_pos, "a")),
+                ast.String(any_pos, "a"),
                 ast.Colon(any_pos),
-                ast.Scalar(ast.Integer(any_pos, 1)),
+                ast.Integer(any_pos, 1),
                 ast.Comma(any_pos),
             ),
             ast.MappingElement(
-                ast.Scalar(ast.Null(any_pos, None)),
+                ast.Null(any_pos, None),
                 ast.Colon(any_pos),
-                ast.Scalar(ast.Float(any_pos, -123e-5)),
+                ast.Float(any_pos, -123e-5),
                 None,
             ),
         ],
@@ -232,11 +228,11 @@ def test_parse_block_sequence() -> None:
             [
                 ast.BlockSequenceElement(
                     ast.Dash(any_pos),
-                    ast.Scalar(ast.Integer(any_pos, 1)),
+                    ast.Integer(any_pos, 1),
                 ),
                 ast.BlockSequenceElement(
                     ast.Dash(any_pos),
-                    ast.Scalar(ast.String(any_pos, "example")),
+                    ast.String(any_pos, "example"),
                 ),
             ]
         )
@@ -258,12 +254,12 @@ def test_parse_block_mapping() -> None:
                 ast.BlockMappingElement(
                     ast.Name(any_pos, "a"),
                     ast.Colon(any_pos),
-                    ast.Scalar(ast.Integer(any_pos, 1)),
+                    ast.Integer(any_pos, 1),
                 ),
                 ast.BlockMappingElement(
                     ast.String(any_pos, "b"),
                     ast.Colon(any_pos),
-                    ast.Scalar(ast.String(any_pos, "example")),
+                    ast.String(any_pos, "example"),
                 ),
             ]
         )
@@ -275,10 +271,10 @@ def test_parse_literal_lines() -> None:
         parse(
             dedent(
                 """
-        |for i in range(10):
-        |    if i % 2 == 0:
-        |        print(i)
-        """
+                |for i in range(10):
+                |    if i % 2 == 0:
+                |        print(i)
+                """
             )
         )
         == ast.LiteralLines(
@@ -296,10 +292,10 @@ def test_parse_folded_lines() -> None:
         parse(
             dedent(
                 """
-        >Česká zbrojovka
-        >Застава oружје
-        >Императорский Тульский оружейный завод
-        """
+                >Česká zbrojovka
+                >Застава oружје
+                >Императорский Тульский оружейный завод
+                """
             )
         )
         == ast.FoldedLines(
@@ -317,9 +313,9 @@ def test_parse_escaped_literal_lines() -> None:
         parse(
             dedent(
                 r"""
-        \|Smile!
-        \|\U0001F60A
-        """
+                \|Smile!
+                \|\U0001F60A
+                """
             )
         )
         == ast.EscapedLiteralLines(
@@ -336,9 +332,9 @@ def test_parse_escaped_folded_lines() -> None:
         parse(
             dedent(
                 r"""
-        \>a\x62c
-        \>\u00312\U00000033
-        """
+                \>a\x62c
+                \>\u00312\U00000033
+                """
             )
         )
         == ast.EscapedFoldedLines(

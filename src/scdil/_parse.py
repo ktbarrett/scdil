@@ -56,7 +56,7 @@ class Parser:
             value, (ast.Null, ast.Boolean, ast.Integer, ast.Float, ast.String)
         ) and check_token_N(value, N):
             _ = self.next()
-            return ast.Scalar(value)
+            return value
         else:
             return None
 
@@ -224,7 +224,7 @@ class Parser:
     def parse_literal_lines(self, N: Optional[int]) -> Optional[ast.LiteralLines]:
         if isinstance(line := self.peek(), ast.LiteralLine) and check_token_N(line, N):
             _ = self.next()
-            N = get_token_N(line)
+            N = line.N
             lines = [line]
             while True:
                 if not (
@@ -241,7 +241,7 @@ class Parser:
     def parse_folded_lines(self, N: Optional[int]) -> Optional[ast.FoldedLines]:
         if isinstance(line := self.peek(), ast.FoldedLine) and check_token_N(line, N):
             _ = self.next()
-            N = get_token_N(line)
+            N = line.N
             lines = [line]
             while True:
                 if not isinstance(
@@ -261,7 +261,7 @@ class Parser:
             line, N
         ):
             _ = self.next()
-            N = get_token_N(line)
+            N = line.N
             lines = [line]
             while True:
                 if not isinstance(
@@ -281,7 +281,7 @@ class Parser:
             line, N
         ):
             _ = self.next()
-            N = get_token_N(line)
+            N = line.N
             lines = [line]
             while True:
                 if not isinstance(
@@ -307,15 +307,11 @@ class Parser:
         return self.curr
 
 
-def get_token_N(token: ast.Token) -> int:
-    return token.position.charno
-
-
 def check_token_N(token: ast.Token, N: Optional[int]) -> bool:
     if N is None:
         return True
     else:
-        return get_token_N(token) == N
+        return token.N == N
 
 
 class Lexer(Iterator[ast.Token]):

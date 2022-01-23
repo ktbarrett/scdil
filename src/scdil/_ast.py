@@ -12,6 +12,10 @@ class Position:
 class Token:
     position: Position
 
+    @property
+    def N(self) -> int:
+        return self.position.charno
+
 
 @dataclass
 class Null(Token):
@@ -101,15 +105,7 @@ class Dash(Token):
 Node = Union["Value", "Block"]
 Value = Union["Composite", "Scalar"]
 Composite = Union["Sequence", "Mapping"]
-
-
-@dataclass
-class Scalar:
-    value: Union[Null, Boolean, Integer, Float, String]
-
-    @property
-    def N(self) -> int:
-        return self.value.position.charno
+Scalar = Union[Null, Boolean, Integer, Float, String]
 
 
 @dataclass
