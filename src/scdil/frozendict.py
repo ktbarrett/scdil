@@ -1,4 +1,5 @@
 import sys
+from abc import abstractmethod
 from typing import (
     Any,
     Dict,
@@ -12,6 +13,7 @@ from typing import (
     Tuple,
     Type,
     TypeVar,
+    Union,
     ValuesView,
     overload,
 )
@@ -24,9 +26,11 @@ _V_co = TypeVar("_V_co", covariant=True)
 class _SupportsKeysAndGetItem(Protocol[_K, _V_co]):
     """ """
 
+    @abstractmethod
     def keys(self) -> Iterable[_K]:
         ...
 
+    @abstractmethod
     def __getitem__(self, item: _K) -> _V_co:
         ...
 
@@ -39,17 +43,31 @@ class FrozenDict(Mapping[_K, _V_co]):
         ...
 
     @overload
-    def __init__(self, **kwargs: _V_co) -> None:
+    def __init__(self: "FrozenDict[str, _V_co]", **kwargs: _V_co) -> None:
+        ...
+
+    @overload
+    def __init__(self, __map: _SupportsKeysAndGetItem[_K, _V_co]) -> None:
         ...
 
     @overload
     def __init__(
-        self, __map: _SupportsKeysAndGetItem[_K, _V_co], **kwargs: _V_co
+        self: "FrozenDict[Union[str, _K], _V_co]",
+        __map: _SupportsKeysAndGetItem[_K, _V_co],
+        **kwargs: _V_co,
     ) -> None:
         ...
 
     @overload
-    def __init__(self, __iterable: Iterable[Tuple[_K, _V_co]], **kwargs: _V_co) -> None:
+    def __init__(self, __iterable: Iterable[Tuple[_K, _V_co]]) -> None:
+        ...
+
+    @overload
+    def __init__(
+        self: "FrozenDict[Union[str, _K], _V_co]",
+        __iterable: Iterable[Tuple[_K, _V_co]],
+        **kwargs: _V_co,
+    ) -> None:
         ...
 
     @overload
@@ -107,15 +125,15 @@ class FrozenDict(Mapping[_K, _V_co]):
         def __or__(self, __other: Mapping[_K, _V_co]) -> "FrozenDict[_K, _V_co]":
             if not isinstance(__other, Mapping):
                 return NotImplemented
-            res = self.copy()
+            res = FrozenDict(self)
             res |= __other
             return res
 
         def __ror__(self, __other: Mapping[_K, _V_co]) -> "FrozenDict[_K, _V_co]":
             if not isinstance(__other, Mapping):
                 return NotImplemented
-            res = self.copy()
-            res |= __other
+            res = FrozenDict(__other)
+            res |= self
             return res
 
         def __ior__(self, __other: Mapping[_K, _V_co]) -> "FrozenDict[_K, _V_co]":
