@@ -168,13 +168,13 @@ class BlockSequence:
 
 @dataclass
 class BlockMappingElement:
-    name: Union[Name, String]
+    key: Union[Name, String]
     colon: Colon
     value: Node
 
     @property
     def N(self) -> int:
-        return self.name.position.charno
+        return self.key.position.charno
 
 
 @dataclass

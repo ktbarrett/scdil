@@ -25,14 +25,16 @@ class Parser:
         else:
             return self.curr.position
 
-    def parse(self) -> Optional[ast.Node]:
+    def parse(self) -> ast.Node:
         if (parse := self.parse_node(None)) is not None:
             if self.peek() is None:
                 return parse
             else:
-                raise ParseError(self.position, "Expected end of token stream")
+                raise ParseError(
+                    self.position, f"Expected end of token stream, got {self.peek()!r}"
+                )
         else:
-            return None
+            raise ParseError(self.position, f"Invalid SCDIL, got {self.peek()!r}")
 
     def parse_node(self, N: Optional[int]) -> Optional[ast.Node]:
         if (parse := self.parse_value(N)) is not None:

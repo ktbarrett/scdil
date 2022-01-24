@@ -50,11 +50,11 @@ class SCDILSequence(Protocol):
         ...
 
     @abstractmethod
-    def index(self, item: object, start: int = ..., stop: int = ...) -> int:
+    def index(self, item: SCDILValue, start: int = ..., stop: int = ...) -> int:
         ...
 
     @abstractmethod
-    def count(self, item: object) -> int:
+    def count(self, item: SCDILValue) -> int:
         ...
 
 
@@ -79,11 +79,11 @@ class SCDILMapping(Protocol):
         ...
 
     @overload
-    def get(self, item: object) -> Optional[SCDILValue]:
+    def get(self, item: SCDILValue) -> Optional[SCDILValue]:
         ...
 
     @overload
-    def get(self, item: object, default: T) -> Union[SCDILValue, T]:
+    def get(self, item: SCDILValue, default: T) -> Union[SCDILValue, T]:
         ...
 
     @abstractmethod
