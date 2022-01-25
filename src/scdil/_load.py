@@ -88,20 +88,7 @@ def _(node: ast.LiteralLines) -> str:
 
 @scdil_eval.register
 def _(node: ast.FoldedLines) -> str:
-    s: List[str] = []
-    prev_line_empty = True
-    for line in node.lines:
-        value = line.value
-        line_empty = value.strip() == ""
-        if line_empty:
-            s.append("\n")
-        elif prev_line_empty:
-            s.append(value)
-        else:
-            s.append(" ")
-            s.append(value)
-        prev_line_empty = line_empty
-    return "".join(s) + "\n"
+    return folded_lines(node.lines)
 
 
 @scdil_eval.register
@@ -111,9 +98,15 @@ def _(node: ast.EscapedLiteralLines) -> str:
 
 @scdil_eval.register
 def _(node: ast.EscapedFoldedLines) -> str:
+    return folded_lines(node.lines)
+
+
+def folded_lines(
+    lines: Union[List[ast.FoldedLine], List[ast.EscapedFoldedLine]]
+) -> str:
     s: List[str] = []
     prev_line_empty = True
-    for line in node.lines:
+    for line in lines:
         value = line.value
         line_empty = value.strip() == ""
         if line_empty:
