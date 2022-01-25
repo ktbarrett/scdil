@@ -15,24 +15,14 @@ from typing import (
 T = TypeVar("T")
 
 # Recursive type aliases are not currently supported python/mypy#731
+# SCDILSequence and SCDILMapping are a workaround
 #
 # SCDILValue = Union[None, bool, int, float, str, "Sequence[SCDILValue]", "Mapping[SCDILValue, SCDILValue]"]
 SCDILValue = Union[None, bool, int, float, str, "SCDILSequence", "SCDILMapping"]
 
 
-# Sequence and Mapping are not Protocols, so we can't just inherit
-# Wouldn't matter anyway since tuple is not a Sequence structurally
-# We have to define a Sequence without a __reversed__ to match it
-#
-# @runtime_checkable
-# class SCDILSequence(Sequence[SCDILValue], Protocol):
-#    ...
-
-
 @runtime_checkable
 class SCDILSequence(Protocol):
-    """ """
-
     @abstractmethod
     def __len__(self) -> int:
         ...
@@ -41,8 +31,14 @@ class SCDILSequence(Protocol):
     def __contains__(self, item: object) -> bool:
         ...
 
+    @overload
     @abstractmethod
     def __getitem__(self, item: int) -> SCDILValue:
+        ...
+
+    @overload
+    @abstractmethod
+    def __getitem__(self, item: slice) -> "SCDILSequence":
         ...
 
     @abstractmethod
@@ -50,18 +46,20 @@ class SCDILSequence(Protocol):
         ...
 
     @abstractmethod
-    def index(self, item: SCDILValue, start: int = ..., stop: int = ...) -> int:
+    def __reversed__(self) -> Iterator[SCDILValue]:
         ...
 
     @abstractmethod
-    def count(self, item: SCDILValue) -> int:
+    def index(self, value: SCDILValue, start: int = ..., stop: int = ...) -> int:
+        ...
+
+    @abstractmethod
+    def count(self, value: SCDILValue) -> int:
         ...
 
 
 @runtime_checkable
 class SCDILMapping(Protocol):
-    """ """
-
     @abstractmethod
     def __len__(self) -> int:
         ...
@@ -79,11 +77,15 @@ class SCDILMapping(Protocol):
         ...
 
     @overload
-    def get(self, item: SCDILValue) -> Optional[SCDILValue]:
+    @abstractmethod
+    def get(self, __key: SCDILValue) -> Optional[SCDILValue]:
         ...
 
     @overload
-    def get(self, item: SCDILValue, default: T) -> Union[SCDILValue, T]:
+    @abstractmethod
+    def get(
+        self, __key: SCDILValue, default: Union[SCDILValue, T]
+    ) -> Union[SCDILValue, T]:
         ...
 
     @abstractmethod

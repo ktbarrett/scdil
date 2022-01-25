@@ -7,6 +7,10 @@ exclude = '^build/'   # /build/ is output of `pip install .`
                       # Must exclude it since pre-commit does not stash untracked changes
 strict = true
 
+[[tool.mypy.overrides]]
+module = 'scdil'
+implicit_reexport = true
+
 [tool.isort]
 profile = "black"
 
