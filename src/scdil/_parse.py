@@ -654,38 +654,20 @@ class Lexer(Iterator[ast.Token]):
     def consume_escape(self) -> Optional[str]:  # noqa: C901
         assert self.curr == "\\"
         c = self.next()
-        if c == "\\":
-            self.save("\\")
-            return self.next()
-        elif c == '"':
-            self.save('"')
-            return self.next()
-        elif c == "/":
-            self.save("/")
-            return self.next()
-        elif c == "b":
-            self.save("\b")
-            return self.next()
-        elif c == "f":
-            self.save("\f")
-            return self.next()
-        elif c == "n":
-            self.save("\n")
-            return self.next()
-        elif c == "r":
-            self.save("\r")
-            return self.next()
-        elif c == "t":
-            self.save("\t")
-            return self.next()
-        elif c == "x":
-            return self.consume_hex(2)
-        elif c == "u":
-            return self.consume_hex(4)
-        elif c == "U":
-            return self.consume_hex(8)
+        try:
+            escape = escape_codes[c]
+        except KeyError:
+            if c == "x":
+                return self.consume_hex(2)
+            elif c == "u":
+                return self.consume_hex(4)
+            elif c == "U":
+                return self.consume_hex(8)
+            else:
+                raise ParseError(self.position, f"Invalid escape code: '\\{c}'")
         else:
-            raise ParseError(self.position, f"Invalid escape code: '\\{c}'")
+            self.save(escape)
+            return self.next()
 
     def consume_hex(self, n: int) -> Optional[str]:
         local_capture: List[str] = []
