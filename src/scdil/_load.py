@@ -19,7 +19,7 @@ def load(stream: Union[str, TextIO]) -> SCDILValue:
 
 @singledispatch
 def scdil_eval(node: ast.Node) -> SCDILValue:
-    raise NotImplementedError
+    raise NotImplementedError  # pragma: no cover
 
 
 @scdil_eval.register
@@ -117,4 +117,4 @@ def folded_lines(
             s.append(" ")
             s.append(value)
         prev_line_empty = line_empty
-    return "".join(s) + "\n"
+    return "".join(s)
