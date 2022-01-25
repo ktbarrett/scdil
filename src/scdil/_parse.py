@@ -557,23 +557,15 @@ class Lexer(Iterator[ast.Token]):
 
     def lex_literal_line(self) -> ast.LiteralLine:
         assert self.curr == "|"
-        c = self.next()
-        while True:
-            if is_character(c):
-                c = self.save_and_next()
-            elif c in ("\n", None):
-                break
-            elif is_control_code(c):
-                raise ParseError(
-                    self.position,
-                    f"Control codes are not valid line characters, got {c!r}",
-                )
-            else:
-                assert False, "unreachable"  # pragma: no cover
+        self.consume_line()
         return ast.LiteralLine(self.finish_capture(), self.get_capture())
 
     def lex_folded_line(self) -> ast.FoldedLine:
         assert self.curr == ">"
+        self.consume_line()
+        return ast.FoldedLine(self.finish_capture(), self.get_capture())
+
+    def consume_line(self) -> None:
         c = self.next()
         while True:
             if is_character(c):
@@ -587,31 +579,20 @@ class Lexer(Iterator[ast.Token]):
                 )
             else:
                 assert False, "unreachable"  # pragma: no cover
-        return ast.FoldedLine(self.finish_capture(), self.get_capture())
 
     def lex_escaped_literal_line(self) -> ast.EscapedLiteralLine:
         assert self.curr == "\\"
         assert self.next() == "|"
-        c = self.next()
-        while True:
-            if c == "\\":
-                c = self.consume_escape()
-            elif is_character(c):
-                c = self.save_and_next()
-            elif c in ("\n", None):
-                break
-            elif is_control_code(c):
-                raise ParseError(
-                    self.position,
-                    f"Control codes are not valid line characters, got {c!r}",
-                )
-            else:
-                assert False, "unreachable"  # pragma: no cover
+        self.consume_escaped_line()
         return ast.EscapedLiteralLine(self.finish_capture(), self.get_capture())
 
     def lex_escaped_folded_line(self) -> ast.EscapedFoldedLine:
         assert self.curr == "\\"
         assert self.next() == ">"
+        self.consume_escaped_line()
+        return ast.EscapedFoldedLine(self.finish_capture(), self.get_capture())
+
+    def consume_escaped_line(self) -> None:
         c = self.next()
         while True:
             if c == "\\":
@@ -627,7 +608,6 @@ class Lexer(Iterator[ast.Token]):
                 )
             else:
                 assert False, "unreachable"  # pragma: no cover
-        return ast.EscapedFoldedLine(self.finish_capture(), self.get_capture())
 
     def lex_name(self) -> Union[ast.Null, ast.Boolean, ast.Float, ast.Name]:
         c = self.save_and_next()
