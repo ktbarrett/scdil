@@ -4,6 +4,7 @@ import json
 import math
 from typing import Iterable, Iterator, TextIO, Tuple, TypeVar
 
+from scdil._parse import is_letter
 from scdil.types import SCDILMapping, SCDILSequence, SCDILValue
 
 T = TypeVar("T")
@@ -28,6 +29,7 @@ def dump(
     *,
     for_humans: bool = True,
     indent: str = " ",
+    _depth: int = 0,
 ) -> None:
     """Writes a Python value in SCDIL format to the stream"""
     raise TypeError(f"Got instance of unsupported type {type(value).__qualname__!r}")
@@ -40,6 +42,7 @@ def _(
     *,
     for_humans: bool = True,
     indent: str = " ",
+    _depth: int = 0,
 ) -> None:
     stream.write("null")
 
@@ -51,6 +54,7 @@ def _(
     *,
     for_humans: bool = True,
     indent: str = " ",
+    _depth: int = 0,
 ) -> None:
     if value is True:
         stream.write("true")
@@ -65,6 +69,7 @@ def _(
     *,
     for_humans: bool = True,
     indent: str = " ",
+    _depth: int = 0,
 ) -> None:
     if value is math.inf:
         stream.write("inf")
@@ -83,6 +88,7 @@ def _(
     *,
     for_humans: bool = True,
     indent: str = " ",
+    _depth: int = 0,
 ) -> None:
     stream.write(json.dumps(value))
 
@@ -94,6 +100,7 @@ def _(
     *,
     for_humans: bool = True,
     indent: str = " ",
+    _depth: int = 0,
 ) -> None:
     stream.write(json.dumps(value))
 
@@ -104,10 +111,18 @@ def _(
     stream: TextIO,
     *,
     for_humans: bool = True,
-    indent: str = " ",
+    indent: str = "  ",
+    _depth: int = 0,
 ) -> None:
-    if for_humans:
-        raise NotImplementedError
+    if len(value) > 0 and for_humans:
+        total_indent = f"{indent * _depth}- "
+        if _depth > 0:
+            stream.write("\n")
+        for v, last in mark_last(value):
+            stream.write(total_indent)
+            dump(v, stream, for_humans=for_humans, indent=indent, _depth=_depth + 1)
+            if not last:
+                stream.write("\n")
     else:
         stream.write("[")
         for v, last in mark_last(value):
@@ -123,23 +138,38 @@ def _(
     stream: TextIO,
     *,
     for_humans: bool = True,
-    indent: str = " ",
+    indent: str = "  ",
+    _depth: int = 0,
 ) -> None:
     all_str = all(isinstance(k, str) for k in value)
-    if all_str and for_humans:
-        raise NotImplementedError
+    if len(value) > 0 and all_str and for_humans:
+        total_indent = indent * _depth
+        if _depth > 0:
+            stream.write("\n")
+        for (k, v), last in mark_last(value.items()):
+            assert isinstance(k, str)
+            stream.write(total_indent)
+            dump_name(k, stream)
+            stream.write(": ")
+            dump(v, stream, for_humans=for_humans, indent=indent, _depth=_depth + 1)
+            if not last:
+                stream.write("\n")
     else:
         stream.write("{")
         for (k, v), last in mark_last(value.items()):
             dump(k, stream, for_humans=for_humans)
-            if isinstance(k, str):
-                stream.write(":")
-            else:
-                stream.write(": ")
+            stream.write(":")
             dump(v, stream, for_humans=for_humans)
             if not last:
                 stream.write(",")
         stream.write("}")
+
+
+def dump_name(k: str, stream: TextIO) -> None:
+    if all(is_letter(c) for c in k):
+        stream.write(k)
+    else:
+        stream.write(json.dumps(k))
 
 
 def mark_last(iterable: Iterable[T]) -> Iterator[Tuple[T, bool]]:
