@@ -17,7 +17,7 @@ T = TypeVar("T")
 # Recursive type aliases are not currently supported python/mypy#731
 # SCDILSequence and SCDILMapping are a workaround
 #
-# SCDILValue = Union[None, bool, int, float, str, "Sequence[SCDILValue]", "Mapping[SCDILValue, SCDILValue]"]
+# SCDILValue = Union[None, bool, int, float, str, "Sequence[SCDILValue]", "Mapping[str, SCDILValue]"]
 SCDILValue = Union[None, bool, int, float, str, "SCDILSequence", "SCDILMapping"]
 
 
@@ -69,7 +69,7 @@ class SCDILMapping(Protocol):
         ...
 
     @abstractmethod
-    def __getitem__(self, item: SCDILValue) -> SCDILValue:
+    def __getitem__(self, item: str) -> SCDILValue:
         ...
 
     @abstractmethod
@@ -78,18 +78,16 @@ class SCDILMapping(Protocol):
 
     @overload
     @abstractmethod
-    def get(self, __key: SCDILValue) -> Optional[SCDILValue]:
+    def get(self, __key: str) -> Optional[SCDILValue]:
         ...
 
     @overload
     @abstractmethod
-    def get(
-        self, __key: SCDILValue, default: Union[SCDILValue, T]
-    ) -> Union[SCDILValue, T]:
+    def get(self, __key: str, default: T) -> Union[SCDILValue, T]:
         ...
 
     @abstractmethod
-    def keys(self) -> KeysView[SCDILValue]:
+    def keys(self) -> KeysView[str]:
         ...
 
     @abstractmethod
@@ -97,5 +95,5 @@ class SCDILMapping(Protocol):
         ...
 
     @abstractmethod
-    def items(self) -> ItemsView[SCDILValue, SCDILValue]:
+    def items(self) -> ItemsView[str, SCDILValue]:
         ...

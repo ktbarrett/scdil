@@ -145,7 +145,7 @@ While this breaks JSON support, it is intentional.
 character = "[\U00000020-\U0000007E\U000000A0-\U0010FFFF]"
 escape = "\\\\"
        | "\\/"
-       | "\\\"
+       | "\\\""
        | "\\b"
        | "\\f"
        | "\\n"

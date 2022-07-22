@@ -9,6 +9,12 @@ def dev(session: nox.Session) -> None:
     session.run("bash", external=True)
 
 
+@nox.session(reuse_venv=True)
+def check(session: nox.Session) -> None:
+    session.install("pre-commit")
+    session.run("pre-commit", "run", "-a")
+
+
 @nox.session
 def tests(session: nox.Session) -> None:
     session.install("-r", ".test-reqs.txt")

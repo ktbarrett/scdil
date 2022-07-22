@@ -5,3 +5,4 @@ mypy
 nox
 types-setuptools
 pytest
+pre-commit
