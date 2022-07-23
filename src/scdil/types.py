@@ -45,9 +45,12 @@ class SCDILSequence(Protocol):
     def __iter__(self) -> Iterator[SCDILValue]:
         ...
 
-    @abstractmethod
-    def __reversed__(self) -> Iterator[SCDILValue]:
-        ...
+    # tuple does not have a public __reversed__ method, but implements reversed() in some special way.
+    # We don't really need reversed() for this library to function, so we will leave this out for now.
+    #
+    # @abstractmethod
+    # def __reversed__(self) -> Iterator[SCDILValue]:
+    #     ...
 
     @abstractmethod
     def index(self, value: SCDILValue, start: int = ..., stop: int = ...) -> int:
@@ -83,9 +86,7 @@ class SCDILMapping(Protocol):
 
     @overload
     @abstractmethod
-    def get(
-        self, __key: SCDILValue, default: Union[SCDILValue, T]
-    ) -> Union[SCDILValue, T]:
+    def get(self, __key: SCDILValue, default: T) -> Union[SCDILValue, T]:
         ...
 
     @abstractmethod
