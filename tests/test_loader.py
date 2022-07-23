@@ -7,17 +7,20 @@ from scdil.types import SCDILValue
 
 
 def test_1() -> None:
-    assert load(
-        r"""
+    assert (
+        load(
+            r"""
         a: [1, 2, {"a": 1}]
         b: - - 1
              - false
              - 0.1
         "c": d: null
         """
-    ) == cast(
-        SCDILValue,
-        {"a": [1, 2, {"a": 1}], "b": [[1, False, 0.1]], "c": {"d": None}},
+        )
+        == cast(
+            SCDILValue,
+            {"a": [1, 2, {"a": 1}], "b": [[1, False, 0.1]], "c": {"d": None}},
+        )
     )
 
 
