@@ -34,6 +34,19 @@ def dump(
         MachineDumper(stream=stream).dump(value)
 
 
+string_escaper = {i: f"\\x{i:02X}" for i in range(32)}  # C0 control codes
+string_escaper.update(
+    {i: f"\\x{i:02X}" for i in range(127, 160)}
+)  # DEL and C1 control codes
+# special cases
+string_escaper[ord("\n")] = "\\n"
+string_escaper[ord("\r")] = "\\r"
+string_escaper[ord("\t")] = "\\t"
+string_escaper[ord("\\")] = "\\\\"
+string_escaper[ord('"')] = '\\"'
+# we do not do special translation for \b, \f, \v, and \/, because they need to die
+
+
 class DumperBase(ABC):
     @property
     def stream(self) -> TextIO:
@@ -63,11 +76,11 @@ class DumperBase(ABC):
         self.stream.write(json.dumps(value))
 
     def dump_float(self, value: float) -> None:
-        if value is math.inf:
+        if value == math.inf:
             self.stream.write("inf")
-        elif value is -math.inf:
+        elif value == -math.inf:
             self.stream.write("-inf")
-        elif value is math.nan:
+        elif math.isnan(value):
             self.stream.write("nan")
         else:
             self.stream.write(json.dumps(value))
@@ -79,9 +92,7 @@ class DumperBase(ABC):
 
     def dump_line(self, value: str) -> None:
         """Prints line of data (sans terminal newline) with escaped control codes"""
-        control_codes_escaped = value.encode(errors="backslashreplace").decode()
-        others_escaped = control_codes_escaped.replace('"', '\\"').replace("\\", "\\\\")
-        self.stream.write(others_escaped)
+        self.stream.write(value.translate(string_escaper))
 
     @abstractmethod
     def dump(self, value: SCDILValue) -> None:
@@ -139,6 +150,8 @@ class HumanDumper(DumperBase):
         elif isinstance(value, float):
             self.dump_float(value)
         elif isinstance(value, str):
+            if value == "\n":
+                self.stream.write('"\\n"')
             if "\n" in value:
                 self.dump_block_string(value, depth=0)
             else:
@@ -203,8 +216,9 @@ class HumanDumper(DumperBase):
         self.stream.write("}")
 
     def dump_block_string(self, value: str, depth: int) -> None:
-        next_line = "\n" + "  " * depth + "|"
+        next_line = "\n" + "  " * depth
         for line, last in mark_last(value.splitlines()):
+            self.stream.write("|")
             self.dump_line(line)
             if not last:
                 self.stream.write(next_line)
