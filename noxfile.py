@@ -6,7 +6,10 @@ def dev(session: nox.Session) -> None:
     session.install("-r", ".check-reqs.txt")
     session.install("-r", ".test-reqs.txt")
     session.install("-e", ".")
-    session.run("bash", external=True)
+    if session.posargs:
+        session.run(*session.posargs, external=True)
+    else:
+        session.run("bash", external=True)
 
 
 @nox.session(reuse_venv=True)
@@ -20,6 +23,12 @@ def tests(session: nox.Session) -> None:
     session.install("-r", ".test-reqs.txt")
     session.install(".")
     session.run(
-        "pytest", "--cov=scdil", "--cov-branch", "--doctest-modules", "src/", "tests/"
+        "pytest",
+        "--cov=scdil",
+        "--cov-branch",
+        "--doctest-modules",
+        "src/",
+        "tests/",
+        *session.posargs,
     )
     session.run("coverage", "xml")
