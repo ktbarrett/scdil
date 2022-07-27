@@ -34,17 +34,27 @@ def dump(
         MachineDumper(stream=stream).dump(value)
 
 
-string_escaper = {i: f"\\x{i:02X}" for i in range(32)}  # C0 control codes
-string_escaper.update(
+literal_string_escaper = {i: f"\\x{i:02X}" for i in range(32)}  # C0 control codes
+literal_string_escaper.update(
     {i: f"\\x{i:02X}" for i in range(127, 160)}
 )  # DEL and C1 control codes
 # special cases
-string_escaper[ord("\n")] = "\\n"
-string_escaper[ord("\r")] = "\\r"
-string_escaper[ord("\t")] = "\\t"
-string_escaper[ord("\\")] = "\\\\"
-string_escaper[ord('"')] = '\\"'
+literal_string_escaper[ord("\n")] = "\\n"
+literal_string_escaper[ord("\r")] = "\\r"
+literal_string_escaper[ord("\t")] = "\\t"
+literal_string_escaper[ord("\\")] = "\\\\"
+literal_string_escaper[ord('"')] = '\\"'
 # we do not do special translation for \b, \f, \v, and \/, because they need to die
+
+escaped_block_string_escaper = literal_string_escaper.copy()
+del escaped_block_string_escaper[ord('"')]
+
+_use_escape_code = {chr(c) for c in literal_string_escaper}
+_use_escape_code.remove("\n")
+
+
+def needs_escaping(value: str) -> bool:
+    return bool(_use_escape_code.intersection(value))
 
 
 class DumperBase(ABC):
@@ -71,6 +81,8 @@ class DumperBase(ABC):
             self.stream.write("true")
         elif value is False:
             self.stream.write("false")
+        else:  # pragma: no cover
+            assert False, f"Got abnormal bool {value!r}"
 
     def dump_int(self, value: int) -> None:
         self.stream.write(json.dumps(value))
@@ -87,12 +99,11 @@ class DumperBase(ABC):
 
     def dump_str(self, value: str) -> None:
         self.stream.write('"')
-        self.dump_line(value)
+        self.dump_literal_line(value)
         self.stream.write('"')
 
-    def dump_line(self, value: str) -> None:
-        """Prints line of data (sans terminal newline) with escaped control codes"""
-        self.stream.write(value.translate(string_escaper))
+    def dump_literal_line(self, value: str) -> None:
+        self.stream.write(value.translate(literal_string_escaper))
 
     @abstractmethod
     def dump(self, value: SCDILValue) -> None:
@@ -152,8 +163,11 @@ class HumanDumper(DumperBase):
         elif isinstance(value, str):
             if value == "\n":
                 self.stream.write('"\\n"')
-            if "\n" in value:
-                self.dump_block_string(value, depth=0)
+            elif "\n" in value:
+                if needs_escaping(value):
+                    self.dump_escaped_block_string(value, depth=0)
+                else:
+                    self.dump_block_string(value, depth=0)
             else:
                 self.dump_str(value)
         elif isinstance(value, SCDILSequence):
@@ -173,7 +187,7 @@ class HumanDumper(DumperBase):
         # always end the dump with a newline
         self.stream.write("\n")
 
-    def dispatch_literal(self, value: SCDILValue, depth: int) -> None:
+    def dispatch_literal(self, value: SCDILValue, depth: int) -> None:  # noqa: C901
         if value is None:
             self.dump_null()
         elif isinstance(value, bool):
@@ -185,9 +199,15 @@ class HumanDumper(DumperBase):
         elif isinstance(value, str):
             self.dump_str(value)
         elif isinstance(value, SCDILSequence):
-            self.dump_literal_sequence(value, depth=depth)
+            if len(value) == 0:
+                self.stream.write("[]")
+            else:
+                self.dump_literal_sequence(value, depth=depth)
         elif isinstance(value, SCDILMapping):
-            self.dump_literal_mapping(value, depth=depth)
+            if len(value) == 0:
+                self.stream.write("{}")
+            else:
+                self.dump_literal_mapping(value, depth=depth)
         else:
             raise TypeError(f"Got unsupported type {type(value).__qualname__}")
 
@@ -195,10 +215,12 @@ class HumanDumper(DumperBase):
         self.check_recursive(value)
         self.stream.write("[\n")
         line_start = "  " * (depth + 1)
-        for elem in value:
+        for elem, last in mark_last(value):
             self.stream.write(line_start)
             self.dispatch_literal(elem, depth=(depth + 1))
-            self.stream.write(",\n")
+            if not last:
+                self.stream.write(",")
+            self.stream.write("\n")
         self.stream.write("  " * depth)
         self.stream.write("]")
 
@@ -206,22 +228,37 @@ class HumanDumper(DumperBase):
         self.check_recursive(value)
         self.stream.write("{\n")
         line_start = "  " * (depth + 1)
-        for key, val in value.items():
+        for (key, val), last in mark_last(value.items()):
             self.stream.write(line_start)
             self.dispatch_literal(key, depth=(depth + 1))
             self.stream.write(": ")
             self.dispatch_literal(val, depth=(depth + 1))
-            self.stream.write(",\n")
+            if not last:
+                self.stream.write(",")
+            self.stream.write("\n")
         self.stream.write("  " * depth)
         self.stream.write("}")
 
     def dump_block_string(self, value: str, depth: int) -> None:
         next_line = "\n" + "  " * depth
-        for line, last in mark_last(value.splitlines()):
+        for line, last in mark_last(value.split("\n")):
             self.stream.write("|")
-            self.dump_line(line)
+            # normally this would escape control code
+            # but we have already checked that value has no escape codes before calling this function
+            self.dump_literal_line(line)
             if not last:
                 self.stream.write(next_line)
+
+    def dump_escaped_block_string(self, value: str, depth: int) -> None:
+        next_line = "\n" + "  " * depth
+        for line, last in mark_last(value.split("\n")):
+            self.stream.write("\\|")
+            self.dump_escaped_block_line(line)
+            if not last:
+                self.stream.write(next_line)
+
+    def dump_escaped_block_line(self, value: str) -> None:
+        self.stream.write(value.translate(escaped_block_string_escaper))
 
     def dump_block_sequence(self, value: SCDILSequence, depth: int) -> None:
         self.check_recursive(value)
@@ -248,10 +285,15 @@ class HumanDumper(DumperBase):
             self.stream.write(" ")
             self.dump_float(value)
         elif isinstance(value, str):
-            if "\n" in value:
+            if value == "\n":
+                self.stream.write(' "\\n"')
+            elif "\n" in value:
                 self.stream.write("\n")
                 self.stream.write("  " * (depth + 1))
-                self.dump_block_string(value, depth=(depth + 1))
+                if needs_escaping(value):
+                    self.dump_escaped_block_string(value, depth=(depth + 1))
+                else:
+                    self.dump_block_string(value, depth=(depth + 1))
             else:
                 self.stream.write(" ")
                 self.dump_str(value)
@@ -309,10 +351,15 @@ class HumanDumper(DumperBase):
             self.stream.write(" ")
             self.dump_float(value)
         elif isinstance(value, str):
-            if "\n" in value:
+            if value == "\n":
+                self.stream.write(' "\\n"')
+            elif "\n" in value:
                 self.stream.write("\n")
                 self.stream.write("  " * (depth + 1))
-                self.dump_block_string(value, depth=(depth + 1))
+                if needs_escaping(value):
+                    self.dump_escaped_block_string(value, depth=(depth + 1))
+                else:
+                    self.dump_block_string(value, depth=(depth + 1))
             else:
                 self.stream.write(" ")
                 self.dump_str(value)
