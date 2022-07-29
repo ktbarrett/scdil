@@ -70,6 +70,8 @@ def test_equals() -> None:
     assert a != FrozenDict(a=1, b=9)
     assert FrozenDict() != 0
     assert 0 != FrozenDict()
+    assert {"a": 1} == FrozenDict({"a": 1})
+    assert FrozenDict({"a": 1, "b": 2}) != {"a": 1}
 
 
 def test_repr() -> None:

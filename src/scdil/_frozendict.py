@@ -97,9 +97,12 @@ class FrozenDict(Mapping[_K, _V_co]):
         return f"{type(self).__qualname__}({self._dict!r})"
 
     def __eq__(self, __other: object) -> bool:
-        if not isinstance(__other, type(self)):
+        if isinstance(__other, dict):
+            return self._dict == __other
+        elif not isinstance(__other, type(self)):
             return NotImplemented
-        return self._dict == __other._dict
+        else:
+            return self._dict == __other._dict
 
     def __hash__(self) -> int:
         return sum(hash(item) for item in self.items())
