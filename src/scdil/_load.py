@@ -83,7 +83,7 @@ def _(node: ast.BlockMapping) -> SCDILMapping:
 
 @scdil_eval.register
 def _(node: ast.LiteralLines) -> str:
-    return "\n".join(line.value for line in node.lines) + "\n"
+    return "\n".join(line.value for line in node.lines)
 
 
 @scdil_eval.register
@@ -93,7 +93,7 @@ def _(node: ast.FoldedLines) -> str:
 
 @scdil_eval.register
 def _(node: ast.EscapedLiteralLines) -> str:
-    return "\n".join(line.value for line in node.lines) + "\n"
+    return "\n".join(line.value for line in node.lines)
 
 
 @scdil_eval.register
@@ -107,8 +107,8 @@ def folded_lines(
     s: List[str] = []
     prev_line_empty = True
     for line in lines:
-        value = line.value
-        line_empty = value.strip() == ""
+        value = line.value.strip(" ")
+        line_empty = value == ""
         if line_empty:
             s.append("\n")
         elif prev_line_empty:

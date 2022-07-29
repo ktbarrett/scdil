@@ -1,63 +1,77 @@
 from textwrap import dedent
-from typing import cast
 
 from scdil import load
 from scdil.frozendict import FrozenDict
-from scdil.types import SCDILValue
 
 
 def test_1() -> None:
     assert (
         load(
-            r"""
-        a: [1, 2, {"a": 1}]
-        b: - - 1
-             - false
-             - 0.1
-        "c": d: null
-        """
+            dedent(
+                """\
+                a: [1, 2, {"a": 1}]
+                b: - - 1
+                     - false
+                     - 0.1
+                "c": d: null
+                """
+            )
         )
-        == cast(
-            SCDILValue,
-            {"a": [1, 2, {"a": 1}], "b": [[1, False, 0.1]], "c": {"d": None}},
-        )
+        == {"a": [1, 2, {"a": 1}], "b": [[1, False, 0.1]], "c": {"d": None}}
     )
 
 
 def test_2() -> None:
     assert (
         load(
-            r"""
-        {{}: null, [1, 2, 3]: null}
-        """
+            dedent(
+                """\
+                {{}: null, [1, 2, 3]: null}
+                """
+            )
         )
-        == cast(SCDILValue, {FrozenDict(): None, (1, 2, 3): None})
+        == {FrozenDict(): None, (1, 2, 3): None}
     )
 
 
-def test_3() -> None:
+def test_block_string() -> None:
     assert (
         load(
-            """
-        |for i in range(10):
-        |    if i % 2 == 0:
-        |        print(i)
-        """
+            dedent(
+                """\
+                |for i in range(10):
+                |    if i % 2 == 0:
+                |        print(i)
+                |
+                """
+            )
         )
         == dedent(
             """\
-        for i in range(10):
-            if i % 2 == 0:
-                print(i)
+            for i in range(10):
+                if i % 2 == 0:
+                    print(i)
         """
         )
     )
-
-
-def test_4() -> None:
     assert (
         load(
-            """
+            dedent(
+                """\
+                |abc
+                |
+                |def
+                """
+            )
+        )
+        == "abc\n\ndef"
+    )
+
+
+def test_block_folded_string() -> None:
+    assert (
+        load(
+            """\
         >This is a long
         >sentence, split
         >over many lines.
@@ -67,4 +81,47 @@ def test_4() -> None:
         """
         )
         == "This is a long sentence, split over many lines.\nAnd here is another long sentence."
+    )
+    assert (
+        load(
+            dedent(
+                """\
+                >123
+                >
+                >
+                >       jeb
+                >
+                """
+            )
+        )
+        == "123\n\njeb\n"
+    )
+
+
+def test_escaped_block_string() -> None:
+    assert (
+        load(
+            dedent(
+                """\
+                \\|Control codes are \\x00 through \\x1F
+                \\|and \\x7F through \\x9F.
+                """
+            )
+        )
+        == "Control codes are \x00 through \x1F\nand \x7F through \x9F."
+    )
+
+
+def test_escaped_block_folded_string() -> None:
+    assert (
+        load(
+            dedent(
+                """\
+                \\>Control codes are \\x00 through \\x1F
+                \\>and \\x7F through \\x9F.
+                \\>
+                """
+            )
+        )
+        == "Control codes are \x00 through \x1F and \x7F through \x9F.\n"
     )
