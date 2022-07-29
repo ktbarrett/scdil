@@ -1,3 +1,6 @@
+![Tests](https://github.com/ktbarrett/scdil/actions/workflows/tests.yaml/badge.svg)
+[![codecov](https://codecov.io/gh/ktbarrett/scdil/branch/dev/graph/badge.svg?token=5TCD4LSP5F)](https://codecov.io/gh/ktbarrett/scdil)
+
 # `scdil` - Simple Configuration and Data Interchange Language
 
 A simple data interchange language that is effective at both human-to-program and program-to-program data interchange.
