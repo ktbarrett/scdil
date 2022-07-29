@@ -3,12 +3,12 @@ from io import StringIO
 from typing import Dict, List, TextIO, Union
 
 import scdil._ast as ast
+from scdil._frozendict import FrozenDict
 from scdil._parse import Parser
-from scdil.frozendict import FrozenDict
-from scdil.types import SCDILMapping, SCDILSequence, SCDILValue
+from scdil._types import Mapping, Sequence, Value
 
 
-def load(stream: Union[str, TextIO]) -> SCDILValue:
+def load(stream: Union[str, TextIO]) -> Value:
     """Creates a Python object from SCDIL text or file"""
     if isinstance(stream, str):
         stream = StringIO(stream)
@@ -18,7 +18,7 @@ def load(stream: Union[str, TextIO]) -> SCDILValue:
 
 
 @singledispatch
-def scdil_eval(node: ast.Node) -> SCDILValue:
+def scdil_eval(node: ast.Node) -> Value:
     raise NotImplementedError  # pragma: no cover
 
 
@@ -48,15 +48,15 @@ def _(node: ast.Boolean) -> bool:
 
 
 @scdil_eval.register
-def _(node: ast.Sequence) -> SCDILSequence:
+def _(node: ast.Sequence) -> Sequence:
     return [scdil_eval(elem.value) for elem in node.elements]
 
 
 @scdil_eval.register
-def _(node: ast.Mapping) -> SCDILMapping:
-    res: Dict[SCDILValue, SCDILValue] = {}
+def _(node: ast.Mapping) -> Mapping:
+    res: Dict[Value, Value] = {}
     for elem in node.elements:
-        key: SCDILValue = scdil_eval(elem.key)
+        key: Value = scdil_eval(elem.key)
         if isinstance(key, dict):
             key = FrozenDict(key)
         elif isinstance(key, list):
@@ -67,13 +67,13 @@ def _(node: ast.Mapping) -> SCDILMapping:
 
 
 @scdil_eval.register
-def _(node: ast.BlockSequence) -> SCDILSequence:
+def _(node: ast.BlockSequence) -> Sequence:
     return [scdil_eval(elem.value) for elem in node.elements]
 
 
 @scdil_eval.register
-def _(node: ast.BlockMapping) -> SCDILMapping:
-    res: Dict[SCDILValue, SCDILValue] = {}
+def _(node: ast.BlockMapping) -> Mapping:
+    res: Dict[Value, Value] = {}
     for elem in node.elements:
         key = elem.key.value
         value = scdil_eval(elem.value)

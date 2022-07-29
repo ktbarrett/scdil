@@ -1,7 +1,6 @@
 from textwrap import dedent
 
-from scdil import load
-from scdil.frozendict import FrozenDict
+from scdil import FrozenDict, load
 
 
 def test_1() -> None:

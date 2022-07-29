@@ -5,13 +5,13 @@ import sys
 from abc import ABC, abstractmethod
 from typing import Iterable, Iterator, Set, TextIO, Tuple, TypeVar, cast
 
-from scdil.types import SCDILMapping, SCDILSequence, SCDILValue
+from scdil._types import Mapping, Sequence, Value
 
 T = TypeVar("T")
 
 
 def dumps(
-    value: SCDILValue,
+    value: Value,
     *,
     for_humans: bool = True,
 ) -> str:
@@ -22,7 +22,7 @@ def dumps(
 
 
 def dump(
-    value: SCDILValue,
+    value: Value,
     *,
     stream: TextIO = sys.stdout,
     for_humans: bool = True,
@@ -66,7 +66,7 @@ class DumperBase(ABC):
         self._stream = stream
         self._seen: Set[int] = set()
 
-    def check_recursive(self, value: SCDILValue) -> None:
+    def check_recursive(self, value: Value) -> None:
         if id(value) in self._seen:
             raise ValueError(
                 f"Object {object.__repr__(value)} is recursive, aborting dump"
@@ -106,12 +106,12 @@ class DumperBase(ABC):
         self.stream.write(value.translate(literal_string_escaper))
 
     @abstractmethod
-    def dump(self, value: SCDILValue) -> None:
+    def dump(self, value: Value) -> None:
         ...
 
 
 class MachineDumper(DumperBase):
-    def dump(self, value: SCDILValue) -> None:
+    def dump(self, value: Value) -> None:
         if value is None:
             self.dump_null()
         elif isinstance(value, bool):
@@ -122,14 +122,14 @@ class MachineDumper(DumperBase):
             self.dump_float(value)
         elif isinstance(value, str):
             self.dump_str(value)
-        elif isinstance(value, SCDILSequence):
+        elif isinstance(value, Sequence):
             self.dump_sequence(value)
-        elif isinstance(value, SCDILMapping):
+        elif isinstance(value, Mapping):
             self.dump_mapping(value)
         else:
             raise TypeError(f"Got unsupported type {type(value).__qualname__}")
 
-    def dump_sequence(self, value: SCDILSequence) -> None:
+    def dump_sequence(self, value: Sequence) -> None:
         self.check_recursive(value)
         self.stream.write("[")
         for elem, last in mark_last(value):
@@ -138,7 +138,7 @@ class MachineDumper(DumperBase):
                 self.stream.write(",")
         self.stream.write("]")
 
-    def dump_mapping(self, value: SCDILMapping) -> None:
+    def dump_mapping(self, value: Mapping) -> None:
         self.check_recursive(value)
         self.stream.write("{")
         for (key, val), last in mark_last(value.items()):
@@ -151,7 +151,7 @@ class MachineDumper(DumperBase):
 
 
 class HumanDumper(DumperBase):
-    def dump(self, value: SCDILValue) -> None:  # noqa: C901
+    def dump(self, value: Value) -> None:  # noqa: C901
         if value is None:
             self.dump_null()
         elif isinstance(value, bool):
@@ -170,12 +170,12 @@ class HumanDumper(DumperBase):
                     self.dump_block_string(value, depth=0)
             else:
                 self.dump_str(value)
-        elif isinstance(value, SCDILSequence):
+        elif isinstance(value, Sequence):
             if len(value) == 0:
                 self.stream.write("[]")
             else:
                 self.dump_block_sequence(value, depth=0)
-        elif isinstance(value, SCDILMapping):
+        elif isinstance(value, Mapping):
             if len(value) == 0:
                 self.stream.write("{}")
             elif all(isinstance(key, str) for key in value.keys()):
@@ -187,7 +187,7 @@ class HumanDumper(DumperBase):
         # always end the dump with a newline
         self.stream.write("\n")
 
-    def dispatch_literal(self, value: SCDILValue, depth: int) -> None:  # noqa: C901
+    def dispatch_literal(self, value: Value, depth: int) -> None:  # noqa: C901
         if value is None:
             self.dump_null()
         elif isinstance(value, bool):
@@ -198,12 +198,12 @@ class HumanDumper(DumperBase):
             self.dump_float(value)
         elif isinstance(value, str):
             self.dump_str(value)
-        elif isinstance(value, SCDILSequence):
+        elif isinstance(value, Sequence):
             if len(value) == 0:
                 self.stream.write("[]")
             else:
                 self.dump_literal_sequence(value, depth=depth)
-        elif isinstance(value, SCDILMapping):
+        elif isinstance(value, Mapping):
             if len(value) == 0:
                 self.stream.write("{}")
             else:
@@ -211,7 +211,7 @@ class HumanDumper(DumperBase):
         else:
             raise TypeError(f"Got unsupported type {type(value).__qualname__}")
 
-    def dump_literal_sequence(self, value: SCDILSequence, depth: int) -> None:
+    def dump_literal_sequence(self, value: Sequence, depth: int) -> None:
         self.check_recursive(value)
         self.stream.write("[\n")
         line_start = "  " * (depth + 1)
@@ -224,7 +224,7 @@ class HumanDumper(DumperBase):
         self.stream.write("  " * depth)
         self.stream.write("]")
 
-    def dump_literal_mapping(self, value: SCDILMapping, depth: int) -> None:
+    def dump_literal_mapping(self, value: Mapping, depth: int) -> None:
         self.check_recursive(value)
         self.stream.write("{\n")
         line_start = "  " * (depth + 1)
@@ -260,7 +260,7 @@ class HumanDumper(DumperBase):
     def dump_escaped_block_line(self, value: str) -> None:
         self.stream.write(value.translate(escaped_block_string_escaper))
 
-    def dump_block_sequence(self, value: SCDILSequence, depth: int) -> None:
+    def dump_block_sequence(self, value: Sequence, depth: int) -> None:
         self.check_recursive(value)
         next_line = "\n" + "  " * depth
         for elem, last in mark_last(value):
@@ -270,7 +270,7 @@ class HumanDumper(DumperBase):
                 self.stream.write(next_line)
 
     def dispatch_block_sequence_elem(  # noqa: C901
-        self, value: SCDILValue, depth: int
+        self, value: Value, depth: int
     ) -> None:
         if value is None:
             self.stream.write(" ")
@@ -297,14 +297,14 @@ class HumanDumper(DumperBase):
             else:
                 self.stream.write(" ")
                 self.dump_str(value)
-        elif isinstance(value, SCDILSequence):
+        elif isinstance(value, Sequence):
             if len(value) == 0:
                 self.stream.write(" []")
             else:
                 self.stream.write("\n")
                 self.stream.write("  " * (depth + 1))
                 self.dump_block_sequence(value, depth=(depth + 1))
-        elif isinstance(value, SCDILMapping):
+        elif isinstance(value, Mapping):
             if len(value) == 0:
                 self.stream.write(" {}")
             elif all(isinstance(key, str) for key in value.keys()):
@@ -317,7 +317,7 @@ class HumanDumper(DumperBase):
         else:
             raise TypeError(f"Got unsupported type {type(value).__qualname__}")
 
-    def dump_block_mapping(self, value: SCDILMapping, depth: int) -> None:
+    def dump_block_mapping(self, value: Mapping, depth: int) -> None:
         self.check_recursive(value)
         next_line = "\n" + "  " * depth
         for (key, val), last in mark_last(value.items()):
@@ -336,7 +336,7 @@ class HumanDumper(DumperBase):
             self.dump_str(value)
 
     def dispatch_block_mapping_value(  # noqa: C901
-        self, value: SCDILValue, depth: int
+        self, value: Value, depth: int
     ) -> None:
         if value is None:
             self.stream.write(" ")
@@ -363,14 +363,14 @@ class HumanDumper(DumperBase):
             else:
                 self.stream.write(" ")
                 self.dump_str(value)
-        elif isinstance(value, SCDILSequence):
+        elif isinstance(value, Sequence):
             if len(value) == 0:
                 self.stream.write(" []")
             else:
                 self.stream.write("\n")
                 self.stream.write("  " * (depth + 1))
                 self.dump_block_sequence(value, depth=(depth + 1))
-        elif isinstance(value, SCDILMapping):
+        elif isinstance(value, Mapping):
             if len(value) == 0:
                 self.stream.write(" {}")
             elif all(isinstance(key, str) for key in value.keys()):

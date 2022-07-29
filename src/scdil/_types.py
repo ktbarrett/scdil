@@ -15,14 +15,14 @@ from typing import (
 T = TypeVar("T")
 
 # Recursive type aliases are not currently supported python/mypy#731
-# SCDILSequence and SCDILMapping are a workaround
+# Sequence and Mapping are a workaround
 #
-# SCDILValue = Union[None, bool, int, float, str, "Sequence[SCDILValue]", "Mapping[SCDILValue, SCDILValue]"]
-SCDILValue = Union[None, bool, int, float, str, "SCDILSequence", "SCDILMapping"]
+# Value = Union[None, bool, int, float, str, "Sequence[Value]", "Mapping[Value, Value]"]
+Value = Union[None, bool, int, float, str, "Sequence", "Mapping"]
 
 
 @runtime_checkable
-class SCDILSequence(Protocol):
+class Sequence(Protocol):
     @abstractmethod
     def __len__(self) -> int:
         ...
@@ -33,16 +33,16 @@ class SCDILSequence(Protocol):
 
     @overload
     @abstractmethod
-    def __getitem__(self, item: int) -> SCDILValue:
+    def __getitem__(self, item: int) -> Value:
         ...
 
     @overload
     @abstractmethod
-    def __getitem__(self, item: slice) -> "SCDILSequence":
+    def __getitem__(self, item: slice) -> "Sequence":
         ...
 
     @abstractmethod
-    def __iter__(self) -> Iterator[SCDILValue]:
+    def __iter__(self) -> Iterator[Value]:
         ...
 
     # tuple does not have a public __reversed__ method, but implements reversed() in some special way.
@@ -53,16 +53,16 @@ class SCDILSequence(Protocol):
     #     ...
 
     @abstractmethod
-    def index(self, value: SCDILValue, start: int = ..., stop: int = ...) -> int:
+    def index(self, value: Value, start: int = ..., stop: int = ...) -> int:
         ...
 
     @abstractmethod
-    def count(self, value: SCDILValue) -> int:
+    def count(self, value: Value) -> int:
         ...
 
 
 @runtime_checkable
-class SCDILMapping(Protocol):
+class Mapping(Protocol):
     @abstractmethod
     def __len__(self) -> int:
         ...
@@ -72,31 +72,31 @@ class SCDILMapping(Protocol):
         ...
 
     @abstractmethod
-    def __getitem__(self, item: SCDILValue) -> SCDILValue:
+    def __getitem__(self, item: Value) -> Value:
         ...
 
     @abstractmethod
-    def __iter__(self) -> Iterator[SCDILValue]:
-        ...
-
-    @overload
-    @abstractmethod
-    def get(self, __key: SCDILValue) -> Optional[SCDILValue]:
+    def __iter__(self) -> Iterator[Value]:
         ...
 
     @overload
     @abstractmethod
-    def get(self, __key: SCDILValue, default: T) -> Union[SCDILValue, T]:
+    def get(self, __key: Value) -> Optional[Value]:
+        ...
+
+    @overload
+    @abstractmethod
+    def get(self, __key: Value, default: T) -> Union[Value, T]:
         ...
 
     @abstractmethod
-    def keys(self) -> KeysView[SCDILValue]:
+    def keys(self) -> KeysView[Value]:
         ...
 
     @abstractmethod
-    def values(self) -> ValuesView[SCDILValue]:
+    def values(self) -> ValuesView[Value]:
         ...
 
     @abstractmethod
-    def items(self) -> ItemsView[SCDILValue, SCDILValue]:
+    def items(self) -> ItemsView[Value, Value]:
         ...

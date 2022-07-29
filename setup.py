@@ -16,7 +16,7 @@ here = pathlib.Path(__file__).parent.resolve()
 readme_file = here / "README.md"
 long_description = readme_file.read_text(encoding="utf-8")
 
-version_file = here / "src" / "scdil" / "version.py"
+version_file = here / "src" / "scdil" / "_version.py"
 version = get_version(version_file)
 
 setup(

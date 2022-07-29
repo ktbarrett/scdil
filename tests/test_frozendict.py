@@ -2,7 +2,7 @@ import sys
 
 import pytest
 
-from scdil.frozendict import FrozenDict
+from scdil import FrozenDict
 
 
 def test_construct() -> None:

@@ -3,11 +3,10 @@ import math
 import pytest
 
 import scdil
-from scdil.frozendict import FrozenDict
-from scdil.types import SCDILValue
+from scdil import FrozenDict
 
 
-def dumps(value: SCDILValue) -> str:
+def dumps(value: scdil.Value) -> str:
     return scdil.dumps(value, for_humans=False)
 
 
