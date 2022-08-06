@@ -32,9 +32,10 @@ def generate_random_data(  # noqa: C901
     elif typ == 3:
         # 2% chance each of nan, +inf, -inf, or 0.0
         sel = random.randint(0, 49)
-        if sel == 0:
-            return math.nan
-        elif sel == 1:
+        # nan != nan, so we just skip it
+        # if sel == 0:
+        #     return math.nan
+        if sel == 1:
             return -math.inf
         elif sel == 2:
             return math.inf
