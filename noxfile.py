@@ -26,8 +26,6 @@ def tests(session: nox.Session) -> None:
         "pytest",
         "--cov=scdil",
         "--cov-branch",
-        "--doctest-modules",
-        "src/",
         "tests/",
         *session.posargs,
     )
