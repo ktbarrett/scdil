@@ -19,7 +19,7 @@ class Token:
 
 @dataclass
 class Null(Token):
-    value: None
+    value: None = None
 
 
 @dataclass

@@ -15,7 +15,7 @@ class ParseError(Exception):
 class Parser:
     def __init__(self, stream: TextIO) -> None:
         self.lexer = Lexer(stream)
-        self.curr: Optional[ast.Token] = None
+        self.curr: Optional[ast.Token] = next(self.lexer, None)
         self.lookahead: Optional[ast.Token] = None
 
     @property
@@ -26,21 +26,20 @@ class Parser:
             return self.curr.position
 
     def parse(self) -> ast.Node:
-        if (parse := self.parse_node(None)) is not None:
-            if self.peek() is None:
-                return parse
-            else:
-                raise ParseError(
-                    self.position, f"Expected end of token stream, got {self.peek()!r}"
-                )
+        if (parse := self.parse_node(None)) is None:
+            raise ParseError(self.position, f"Invalid SCDIL, got {self.curr!r}")
+        if self.curr is None:
+            return parse
         else:
-            raise ParseError(self.position, f"Invalid SCDIL, got {self.peek()!r}")
+            raise ParseError(
+                self.position, f"Expected end of token stream, got {self.curr!r}"
+            )
 
     def parse_node(self, N: Optional[int]) -> Optional[ast.Node]:
-        if (parse := self.parse_value(N)) is not None:
-            return parse
-        elif (parse2 := self.parse_block(N)) is not None:
+        if (parse2 := self.parse_block(N)) is not None:
             return parse2
+        elif (parse := self.parse_value(N)) is not None:
+            return parse
         else:
             return None
 
@@ -53,14 +52,16 @@ class Parser:
             return None
 
     def parse_scalar(self, N: Optional[int]) -> Optional[ast.Scalar]:
-        value = self.peek()
-        if isinstance(
-            value, (ast.Null, ast.Boolean, ast.Integer, ast.Float, ast.String)
-        ) and check_token_N(value, N):
-            _ = self.next()
-            return value
-        else:
+        if not (
+            isinstance(
+                value := self.curr,
+                (ast.Null, ast.Boolean, ast.Integer, ast.Float, ast.String),
+            )
+            and check_token_N(value, N)
+        ):
             return None
+        _ = self.next()
+        return value
 
     def parse_composite(self, N: Optional[int]) -> Optional[ast.Composite]:
         if (parse := self.parse_sequence(N)) is not None:
@@ -71,72 +72,74 @@ class Parser:
             return None
 
     def parse_sequence(self, N: Optional[int]) -> Optional[ast.Sequence]:
-        if isinstance(lbracket := self.peek(), ast.LBracket) and check_token_N(
-            lbracket, N
+        if not (
+            isinstance(lbracket := self.curr, ast.LBracket)
+            and check_token_N(lbracket, N)
         ):
-            _ = self.next()
-            elements: List[ast.SequenceElement] = []
-            while True:
-                if (element := self.parse_sequence_element()) is None:
-                    break
-                else:
-                    elements.append(element)
-                if element.comma is None:
-                    break
-            if not isinstance(rbracket := self.next(), ast.RBracket):
-                raise ParseError(
-                    self.position,
-                    f"Expected a ']' after last element in sequence, got {rbracket!r}",
-                )
-            else:
-                return ast.Sequence(lbracket, elements, rbracket)
-        else:
             return None
+        _ = self.next()
+        elements: List[ast.SequenceElement] = []
+        while True:
+            if (element := self.parse_sequence_element()) is None:
+                break
+            else:
+                elements.append(element)
+            if element.comma is None:
+                break
+        if not isinstance(rbracket := self.curr, ast.RBracket):
+            raise ParseError(
+                self.position,
+                f"Expected a ']' after last element in sequence, got {rbracket!r}",
+            )
+        _ = self.next()
+        return ast.Sequence(lbracket, elements, rbracket)
 
     def parse_sequence_element(self) -> Optional[ast.SequenceElement]:
         if (value := self.parse_value(None)) is None:
             return None
-        if isinstance(comma := self.peek(), ast.Comma):
+        if isinstance(comma := self.curr, ast.Comma):
             _ = self.next()
         else:
             comma = None
         return ast.SequenceElement(value, comma)
 
     def parse_mapping(self, N: Optional[int]) -> Optional[ast.Mapping]:
-        if isinstance(lcurly := self.peek(), ast.LCurly) and check_token_N(lcurly, N):
-            _ = self.next()
-            elements: List[ast.MappingElement] = []
-            while True:
-                if (element := self.parse_mapping_element()) is None:
-                    break
-                else:
-                    elements.append(element)
-                if element.comma is None:
-                    break
-            if not isinstance(rcurly := self.next(), ast.RCurly):
-                raise ParseError(
-                    self.position,
-                    f"Expected a '}}' after last element in mapping, got {rcurly!r}",
-                )
-            else:
-                return ast.Mapping(lcurly, elements, rcurly)
-        else:
+        if not (
+            isinstance(lcurly := self.curr, ast.LCurly) and check_token_N(lcurly, N)
+        ):
             return None
+        _ = self.next()
+        elements: List[ast.MappingElement] = []
+        while True:
+            if (element := self.parse_mapping_element()) is None:
+                break
+            else:
+                elements.append(element)
+            if element.comma is None:
+                break
+        if not isinstance(rcurly := self.curr, ast.RCurly):
+            raise ParseError(
+                self.position,
+                f"Expected a '}}' after last element in mapping, got {rcurly!r}",
+            )
+        _ = self.next()
+        return ast.Mapping(lcurly, elements, rcurly)
 
     def parse_mapping_element(self) -> Optional[ast.MappingElement]:
         if (key := self.parse_value(None)) is None:
             return None
-        if not isinstance(colon := self.next(), ast.Colon):
+        if not isinstance(colon := self.curr, ast.Colon):
             raise ParseError(
                 self.position,
                 f"Expected a ':' after key in mapping element, got {colon!r}",
             )
+        _ = self.next()
         if (value := self.parse_value(None)) is None:
             raise ParseError(
                 self.position,
-                f"Expected a value after ':' in mapping element, got {self.peek()!r}",
+                f"Expected a value after ':' in mapping element, got {self.curr!r}",
             )
-        if isinstance(comma := self.peek(), ast.Comma):
+        if isinstance(comma := self.curr, ast.Comma):
             _ = self.next()
         else:
             comma = None
@@ -153,63 +156,65 @@ class Parser:
             return None
 
     def parse_block_sequence(self, N: Optional[int]) -> Optional[ast.BlockSequence]:
-        if (element := self.parse_block_sequence_element(N)) is not None:
-            N = element.N
-            elements = [element]
-            while True:
-                if (element := self.parse_block_sequence_element(N)) is None:
-                    break
-                elements.append(element)
-            return ast.BlockSequence(elements)
-        else:
+        if (element := self.parse_block_sequence_element(N)) is None:
             return None
+        N = element.N
+        elements = [element]
+        while True:
+            if (element := self.parse_block_sequence_element(N)) is None:
+                break
+            elements.append(element)
+        return ast.BlockSequence(elements)
 
     def parse_block_sequence_element(
         self, N: Optional[int]
     ) -> Optional[ast.BlockSequenceElement]:
-        if isinstance(dash := self.peek(), ast.Dash) and check_token_N(dash, N):
-            _ = self.next()
-            if (value := self.parse_node(None)) is None:
-                raise ParseError(
-                    self.position,
-                    f"Expected a value to begin block sequence element, got {self.peek()!r}",
-                )
-            return ast.BlockSequenceElement(dash, value)
-        else:
+        if not (isinstance(dash := self.curr, ast.Dash) and check_token_N(dash, N)):
             return None
+        _ = self.next()
+        if (value := self.parse_node(None)) is None:
+            raise ParseError(
+                self.position,
+                f"Expected a value to begin block sequence element, got {self.curr!r}",
+            )
+        return ast.BlockSequenceElement(dash, value)
 
     def parse_block_mapping(self, N: Optional[int]) -> Optional[ast.BlockMapping]:
-        if (element := self.parse_block_mapping_element(N)) is not None:
-            N = element.N
-            elements = [element]
-            while True:
-                if (element := self.parse_block_mapping_element(N)) is None:
-                    break
-                elements.append(element)
-            return ast.BlockMapping(elements)
-        else:
+        if (element := self.parse_block_mapping_element(N)) is None:
             return None
+        N = element.N
+        elements = [element]
+        while True:
+            if (element := self.parse_block_mapping_element(N)) is None:
+                break
+            elements.append(element)
+        return ast.BlockMapping(elements)
 
     def parse_block_mapping_element(
         self, N: Optional[int]
     ) -> Optional[ast.BlockMappingElement]:
-        if isinstance(name := self.peek(), (ast.Name, ast.String)) and check_token_N(
-            name, N
+        name = self.curr
+        if not (
+            (
+                isinstance(name, ast.Name)
+                or (isinstance(name, ast.String) and isinstance(self.peek(), ast.Colon))
+            )
+            and check_token_N(name, N)
         ):
-            _ = self.next()
-            if not isinstance(colon := self.next(), ast.Colon):
-                raise ParseError(
-                    self.position,
-                    f"Expected a ':' after key in block mapping element, got {colon!r}",
-                )
-            if (value := self.parse_node(None)) is None:
-                raise ParseError(
-                    self.position,
-                    f"Expected value after ':' in block mapping element, got {self.peek()!r}",
-                )
-            return ast.BlockMappingElement(name, colon, value)
-        else:
             return None
+        _ = self.next()
+        if not isinstance(colon := self.curr, ast.Colon):
+            raise ParseError(
+                self.position,
+                f"Expected a ':' after key in block mapping element, got {colon!r}",
+            )
+        _ = self.next()
+        if (value := self.parse_node(None)) is None:
+            raise ParseError(
+                self.position,
+                f"Expected value after ':' in block mapping element, got {self.curr!r}",
+            )
+        return ast.BlockMappingElement(name, colon, value)
 
     def parse_block_string(self, N: Optional[int]) -> Optional[ast.BlockString]:
         if (block1 := self.parse_literal_lines(N)) is not None:
@@ -224,77 +229,80 @@ class Parser:
             return None
 
     def parse_literal_lines(self, N: Optional[int]) -> Optional[ast.LiteralLines]:
-        if isinstance(line := self.peek(), ast.LiteralLine) and check_token_N(line, N):
-            _ = self.next()
-            N = line.N
-            lines = [line]
-            while True:
-                if not (
-                    isinstance(line := self.peek(), ast.LiteralLine)
-                    and check_token_N(line, N)
-                ):
-                    break
-                lines.append(line)
-                self.next()
-            return ast.LiteralLines(lines)
-        else:
+        if not (
+            isinstance(line := self.curr, ast.LiteralLine) and check_token_N(line, N)
+        ):
             return None
+        _ = self.next()
+        N = line.N
+        lines = [line]
+        while True:
+            if not (
+                isinstance(line := self.curr, ast.LiteralLine)
+                and check_token_N(line, N)
+            ):
+                break
+            lines.append(line)
+            self.next()
+        return ast.LiteralLines(lines)
 
     def parse_folded_lines(self, N: Optional[int]) -> Optional[ast.FoldedLines]:
-        if isinstance(line := self.peek(), ast.FoldedLine) and check_token_N(line, N):
-            _ = self.next()
-            N = line.N
-            lines = [line]
-            while True:
-                if not isinstance(
-                    line := self.peek(), ast.FoldedLine
-                ) or not check_token_N(line, N):
-                    break
-                lines.append(line)
-                self.next()
-            return ast.FoldedLines(lines)
-        else:
+        if not (
+            isinstance(line := self.curr, ast.FoldedLine) and check_token_N(line, N)
+        ):
             return None
+        _ = self.next()
+        N = line.N
+        lines = [line]
+        while True:
+            if not isinstance(line := self.curr, ast.FoldedLine) or not check_token_N(
+                line, N
+            ):
+                break
+            lines.append(line)
+            self.next()
+        return ast.FoldedLines(lines)
 
     def parse_escaped_literal_lines(
         self, N: Optional[int]
     ) -> Optional[ast.EscapedLiteralLines]:
-        if isinstance(line := self.peek(), ast.EscapedLiteralLine) and check_token_N(
-            line, N
+        if not (
+            isinstance(line := self.curr, ast.EscapedLiteralLine)
+            and check_token_N(line, N)
         ):
-            _ = self.next()
-            N = line.N
-            lines = [line]
-            while True:
-                if not isinstance(
-                    line := self.peek(), ast.EscapedLiteralLine
-                ) or not check_token_N(line, N):
-                    break
-                lines.append(line)
-                self.next()
-            return ast.EscapedLiteralLines(lines)
-        else:
             return None
+        _ = self.next()
+        N = line.N
+        lines = [line]
+        while True:
+            if not isinstance(
+                line := self.curr, ast.EscapedLiteralLine
+            ) or not check_token_N(line, N):
+                break
+            lines.append(line)
+            self.next()
+        return ast.EscapedLiteralLines(lines)
 
     def parse_escaped_folded_lines(
         self, N: Optional[int]
     ) -> Optional[ast.EscapedFoldedLines]:
-        if isinstance(line := self.peek(), ast.EscapedFoldedLine) and check_token_N(
-            line, N
+        if not (
+            isinstance(line := self.curr, ast.EscapedFoldedLine)
+            and check_token_N(line, N)
         ):
-            _ = self.next()
-            N = line.N
-            lines = [line]
-            while True:
-                if not isinstance(
-                    line := self.peek(), ast.EscapedFoldedLine
-                ) or not check_token_N(line, N):
-                    break
-                lines.append(line)
-                self.next()
-            return ast.EscapedFoldedLines(lines)
-        else:
             return None
+        _ = self.next()
+        N = line.N
+        lines = [line]
+        while True:
+            if not (
+                isinstance(line := self.curr, ast.EscapedFoldedLine)
+                and check_token_N(line, N)
+            ):
+                break
+            lines.append(line)
+            self.next()
+        return ast.EscapedFoldedLines(lines)
 
     def peek(self) -> Optional[ast.Token]:
         if self.lookahead is None:
@@ -615,7 +623,7 @@ class Lexer(Iterator[ast.Token]):
             c = self.save_and_next()
         value = self.get_capture()
         if value == "null":
-            return ast.Null(self.finish_capture(), None)
+            return ast.Null(self.finish_capture())
         elif value == "true":
             return ast.Boolean(self.finish_capture(), True)
         elif value == "false":

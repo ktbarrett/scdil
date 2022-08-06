@@ -340,7 +340,7 @@ Function-like Rules may have variables and guard clauses.
 **Nodes**
 ```
 scdil() variable N = node(N)
-node(N) = value(N) | block(N)
+node(N) = block(N) | value(N)
 value(N) = scalar(N) | composite(N)
 scalar(N) = null@N | boolean@N | integer@N | float@N | string@N
 composite(N) = sequence(N) | mapping(N)

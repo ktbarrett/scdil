@@ -183,7 +183,7 @@ def test_parse_scalars() -> None:
 
 
 def test_parse_sequence() -> None:
-    assert parse('[123, "123",]') == ast.Sequence(
+    assert parse('[123, \n"123",]') == ast.Sequence(
         ast.LBracket(any_pos),
         [
             ast.SequenceElement(ast.Integer(any_pos, 123), ast.Comma(any_pos)),
@@ -191,6 +191,14 @@ def test_parse_sequence() -> None:
         ],
         ast.RBracket(any_pos),
     )
+    assert parse("[null  #comment\n]                      ") == ast.Sequence(
+        ast.LBracket(any_pos),
+        [
+            ast.SequenceElement(ast.Null(any_pos), None),
+        ],
+        ast.RBracket(any_pos),
+    )
+    assert parse("[]") == ast.Sequence(ast.LBracket(any_pos), [], ast.RBracket(any_pos))
 
 
 def test_parse_mapping() -> None:
@@ -211,6 +219,21 @@ def test_parse_mapping() -> None:
             ),
         ],
         ast.RCurly(any_pos),
+    )
+    assert parse("{null:0.0,}") == ast.Mapping(
+        ast.LCurly(any_pos),
+        [
+            ast.MappingElement(
+                ast.Null(any_pos),
+                ast.Colon(any_pos),
+                ast.Float(any_pos, 0.0),
+                ast.Comma(any_pos),
+            ),
+        ],
+        ast.RCurly(any_pos),
+    )
+    assert parse("   {}  # value") == ast.Mapping(
+        ast.LCurly(any_pos), [], ast.RCurly(any_pos)
     )
 
 
@@ -260,6 +283,30 @@ def test_parse_block_mapping() -> None:
                     ast.String(any_pos, "b"),
                     ast.Colon(any_pos),
                     ast.String(any_pos, "example"),
+                ),
+            ]
+        )
+    )
+    assert (
+        parse(
+            dedent(
+                """
+                "b": "example"
+                a: 1
+                """
+            )
+        )
+        == ast.BlockMapping(
+            [
+                ast.BlockMappingElement(
+                    ast.String(any_pos, "b"),
+                    ast.Colon(any_pos),
+                    ast.String(any_pos, "example"),
+                ),
+                ast.BlockMappingElement(
+                    ast.Name(any_pos, "a"),
+                    ast.Colon(any_pos),
+                    ast.Integer(any_pos, 1),
                 ),
             ]
         )
@@ -344,3 +391,30 @@ def test_parse_escaped_folded_lines() -> None:
             ]
         )
     )
+
+
+def test_parse_errors() -> None:
+    with pytest.raises(ParseError):
+        parse(":")
+    with pytest.raises(ParseError):
+        parse("a:a")
+    with pytest.raises(ParseError):
+        parse("[a,,")
+    with pytest.raises(ParseError):
+        parse("[a 1")
+    with pytest.raises(ParseError):
+        parse('{"a"::}')
+    with pytest.raises(ParseError):
+        parse('{"a" wew}')
+    with pytest.raises(ParseError):
+        parse('{"a": false null')
+    with pytest.raises(ParseError):
+        parse("- ,")
+    with pytest.raises(ParseError):
+        parse("a:")
+    with pytest.raises(ParseError):
+        parse("a: :")
+    with pytest.raises(ParseError):
+        parse("a 1")
+    with pytest.raises(ParseError):
+        parse("180 too much")
